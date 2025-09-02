@@ -5,8 +5,15 @@ import Link from 'next/link'
 
 export default function Home() {
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null)
+  const [searchLocation, setSearchLocation] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [filters, setFilters] = useState({
+    country: 'Malaysia',
+    state: 'Pemitary',
+    rehabType: '',
+    accessibility: false
+  })
 
   const handleUseLocation = () => {
     setLoading(true)
@@ -40,134 +47,277 @@ export default function Home() {
     )
   }
 
+  const mockCentres = [
+    {
+      name: 'Sunrise Rehabilitation Centre',
+      address: '122 Jalan Petaling\nKuala Lumpur',
+      distance: '2.5 km'
+    },
+    {
+      name: 'Taman Pemulihan',
+      address: '456 Lorong Gungai\nPenang',
+      distance: '4.3 km'
+    },
+    {
+      name: 'Rehab Whisper',
+      address: '789 Jalan Bahagia, Ip...\nIpoh',
+      distance: '5.1 km'
+    }
+  ]
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        {/* Hero Section */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Find Rehab Centres Near You
-          </h1>
-          <p className="text-xl text-gray-600 mb-8">
-            Malaysia & Thailand
-          </p>
-          
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+      {/* Hero Section */}
+      <div className="bg-white py-12">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="text-center mb-8">
+            <h1 className="text-4xl font-bold text-gray-900 mb-4">
+              Find Rehab Centres Near You<br />
+              in Malaysia & Thailand
+            </h1>
+          </div>
+
+          {/* Search Section */}
+          <div className="max-w-4xl mx-auto flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <input 
+                type="text" 
+                placeholder="Enter location or centre name"
+                value={searchLocation}
+                onChange={(e) => setSearchLocation(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-lg"
+              />
+            </div>
             <button 
               onClick={handleUseLocation}
               disabled={loading}
-              className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 disabled:bg-gray-400 flex items-center gap-2"
+              className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 disabled:bg-gray-400 flex items-center gap-2 whitespace-nowrap"
             >
-              {loading ? '📍 Finding your location...' : '🎯 Use My Location'}
+              <span className="text-lg">📍</span>
+              {loading ? 'Finding your location...' : 'Use My Location'}
             </button>
-            <input 
-              type="text" 
-              placeholder="Enter location or centre name"
-              className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-            />
           </div>
 
           {/* Location Status */}
           {location && (
-            <div className="mt-4 p-4 bg-green-100 text-green-800 rounded-lg max-w-md mx-auto">
+            <div className="mt-4 p-4 bg-green-100 text-green-800 rounded-lg max-w-md mx-auto text-center">
               📍 Location found: {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
-              <br />
-              <small>Now you can see nearby centres!</small>
             </div>
           )}
 
           {error && (
-            <div className="mt-4 p-4 bg-red-100 text-red-800 rounded-lg max-w-md mx-auto">
+            <div className="mt-4 p-4 bg-red-100 text-red-800 rounded-lg max-w-md mx-auto text-center">
               ❌ {error}
             </div>
           )}
         </div>
+      </div>
 
-        {/* Sample Centres (if location found) */}
-        {location && (
-          <div className="mb-12">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Nearest Centres</h2>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[
-                { name: 'Sunrise Rehabilitation Centre', address: '122 Jalan Petaling, Kuala Lumpur', distance: '2.5 km', type: 'Inpatient' },
-                { name: 'Taman Pemulihan', address: '56 Lorong Gungai, Penang', distance: '4.3 km', type: 'Outpatient' },
-                { name: 'Rehab Whisper', address: '789 Jalan Bahagia, Ipoh', distance: '5.1 km', type: 'Traditional' }
-              ].map((centre, i) => (
-                <div key={i} className="bg-white p-6 rounded-lg shadow border">
-                  <h3 className="font-semibold text-lg mb-2">{centre.name}</h3>
-                  <p className="text-gray-600 mb-1">{centre.address}</p>
-                  <p className="text-blue-500 font-medium mb-2">{centre.distance}</p>
-                  <span className="inline-block bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
-                    {centre.type}
-                  </span>
-                  <div className="mt-4 flex gap-2">
-                    <button className="bg-blue-500 text-white px-4 py-2 rounded text-sm hover:bg-blue-600">
-                      View Details
-                    </button>
-                    <button className="border border-blue-500 text-blue-500 px-4 py-2 rounded text-sm hover:bg-blue-50">
-                      Get Directions
-                    </button>
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="grid lg:grid-cols-4 gap-8">
+          {/* Filters Sidebar */}
+          <div className="lg:col-span-1">
+            <div className="bg-white p-6 rounded-lg shadow-sm">
+              <h3 className="text-lg font-semibold mb-4">Filters</h3>
+              
+              {/* Country Filter */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Country
+                </label>
+                <select 
+                  value={filters.country}
+                  onChange={(e) => setFilters({...filters, country: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="Malaysia">Malaysia</option>
+                  <option value="Thailand">Thailand</option>
+                </select>
+              </div>
+
+              {/* State/Province Filter */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  State / Province
+                </label>
+                <select 
+                  value={filters.state}
+                  onChange={(e) => setFilters({...filters, state: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="Pemitary">Pemitary</option>
+                  <option value="Selangor">Selangor</option>
+                  <option value="Penang">Penang</option>
+                  <option value="Perak">Perak</option>
+                </select>
+              </div>
+
+              {/* Rehab Type Filter */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Rehab Type
+                </label>
+                <div className="space-y-2">
+                  <label className="flex items-center">
+                    <input 
+                      type="checkbox" 
+                      className="mr-2 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    Inpatient
+                  </label>
+                  <label className="flex items-center">
+                    <input 
+                      type="checkbox" 
+                      className="mr-2 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    Outpatient
+                  </label>
+                  <label className="flex items-center">
+                    <input 
+                      type="checkbox" 
+                      className="mr-2 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    Traditional
+                  </label>
+                </div>
+              </div>
+
+              {/* Accessibility Filter */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Accessibility
+                </label>
+                <label className="flex items-center">
+                  <input 
+                    type="checkbox" 
+                    checked={filters.accessibility}
+                    onChange={(e) => setFilters({...filters, accessibility: e.target.checked})}
+                    className="mr-2 w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm">Wheelchair-friendly</span>
+                  <div className="ml-2 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs">✓</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {/* Main Content */}
+          <div className="lg:col-span-3">
+            {/* Map Section */}
+            <div className="bg-white rounded-lg shadow-sm mb-8 overflow-hidden">
+              <div className="h-96 bg-gradient-to-br from-blue-200 via-green-200 to-blue-300 relative">
+                {/* Simplified Malaysia map representation */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="relative w-full h-full">
+                    {/* Main Peninsula */}
+                    <div className="absolute top-12 left-1/2 transform -translate-x-1/2 w-32 h-48 bg-green-300 rounded-bl-3xl rounded-br-lg opacity-80"></div>
+                    
+                    {/* Borneo-like shape */}
+                    <div className="absolute top-16 right-16 w-24 h-32 bg-green-400 rounded-2xl opacity-70"></div>
+                    
+                    {/* Location pins */}
+                    {[
+                      { top: '25%', left: '52%' },
+                      { top: '15%', left: '48%' },
+                      { top: '35%', left: '55%' },
+                      { top: '20%', left: '40%' },
+                      { top: '40%', left: '50%' },
+                      { top: '30%', left: '45%' },
+                      { top: '45%', left: '53%' },
+                      { top: '50%', left: '48%' },
+                      { top: '60%', left: '52%' },
+                    ].map((pin, index) => (
+                      <div 
+                        key={index}
+                        className="absolute w-6 h-6 bg-blue-600 rounded-full border-2 border-white shadow-lg cursor-pointer hover:bg-blue-700 transition-colors"
+                        style={{ top: pin.top, left: pin.left, transform: 'translate(-50%, -50%)' }}
+                        title={`Rehab Centre ${index + 1}`}
+                      >
+                      </div>
+                    ))}
+                    
+                    {/* Malaysia label */}
+                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white/90 px-3 py-1 rounded-lg shadow-sm">
+                      <span className="font-semibold text-gray-800">Malaysia</span>
+                    </div>
+
+                    {/* Map controls */}
+                    <div className="absolute top-4 right-4 flex flex-col space-y-2">
+                      <button className="w-8 h-8 bg-white border border-gray-300 rounded shadow flex items-center justify-center text-lg hover:bg-gray-50 font-bold">
+                        +
+                      </button>
+                      <button className="w-8 h-8 bg-white border border-gray-300 rounded shadow flex items-center justify-center text-lg hover:bg-gray-50 font-bold">
+                        −
+                      </button>
+                    </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Quick Access Cards */}
-        <div className="mb-12">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">
-            How Can We Help?
-          </h2>
-          <div className="grid md:grid-cols-3 gap-6">
-            <Link href="/resources" className="bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow cursor-pointer">
-              <div className="text-3xl mb-3">🎥</div>
-              <h3 className="font-semibold mb-2">Exercise Videos</h3>
-              <p className="text-gray-600">Rehabilitation exercises and therapy guides</p>
-            </Link>
-            <Link href="/centres" className="bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow cursor-pointer">
-              <div className="text-3xl mb-3">📍</div>
-              <h3 className="font-semibold mb-2">Find Centres</h3>
-              <p className="text-gray-600">Locate nearby rehabilitation facilities</p>
-            </Link>
-            <Link href="/resources" className="bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow cursor-pointer">
-              <div className="text-3xl mb-3">📚</div>
-              <h3 className="font-semibold mb-2">Resources</h3>
-              <p className="text-gray-600">Helpful tools and comprehensive guides</p>
-            </Link>
-          </div>
-        </div>
-
-        {/* About Section */}
-        <div className="text-center mb-12">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            About RehabFinder
-          </h2>
-          <p className="text-gray-600 max-w-3xl mx-auto">
-            RehabFinder is your comprehensive guide to finding quality rehabilitation centres 
-            across Malaysia and Thailand. We help connect patients and families with the right 
-            care facilities, offering detailed information about services, accessibility, and 
-            expert reviews to make informed healthcare decisions.
-          </p>
-        </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white py-8 mt-16">
-        <div className="max-w-7xl mx-auto px-4 text-center">
-          <div className="mb-4">
-            <div className="flex items-center justify-center space-x-2 mb-2">
-              <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-sm">R</span>
               </div>
-              <span className="font-bold text-xl">RehabFinder</span>
             </div>
-            <p className="text-gray-400">Health, Hope & Access</p>
+
+            {/* Nearest Rehab Centres */}
+            <div className="bg-white rounded-lg shadow-sm mb-8">
+              <div className="p-6 border-b">
+                <h2 className="text-xl font-semibold text-gray-900">
+                  Nearest Rehab Centres
+                </h2>
+              </div>
+              <div className="p-6">
+                <div className="grid md:grid-cols-3 gap-6">
+                  {mockCentres.map((centre, index) => (
+                    <div key={index} className="border border-gray-200 rounded-lg p-4">
+                      <h3 className="font-semibold text-lg mb-2">{centre.name}</h3>
+                      <p className="text-gray-600 text-sm mb-2 whitespace-pre-line">{centre.address}</p>
+                      <p className="text-blue-600 font-medium text-sm mb-3">{centre.distance}</p>
+                      <button className="w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors">
+                        View Details
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
-          <p className="text-gray-400">&copy; 2024 RehabFinder. All rights reserved.</p>
         </div>
-      </footer>
+
+        {/* Feature Cards Section */}
+        <div className="grid md:grid-cols-4 gap-6 mt-12">
+          <div className="bg-blue-100 p-6 rounded-lg text-center">
+            <div className="w-12 h-12 bg-blue-200 rounded-lg mx-auto mb-4 flex items-center justify-center">
+              <span className="text-2xl">▶️</span>
+            </div>
+            <h3 className="font-semibold text-lg mb-2">Exercise Videos</h3>
+            <p className="text-gray-600 text-sm">Guided rehabilitation exercises and therapy routines</p>
+          </div>
+          
+          <div className="bg-green-100 p-6 rounded-lg text-center">
+            <div className="w-12 h-12 bg-green-200 rounded-lg mx-auto mb-4 flex items-center justify-center">
+              <span className="text-2xl">⬇️</span>
+            </div>
+            <h3 className="font-semibold text-lg mb-2">Downloadable Toolkits</h3>
+            <p className="text-gray-600 text-sm">Comprehensive resources for patients and families</p>
+          </div>
+          
+          <div className="bg-orange-100 p-6 rounded-lg text-center">
+            <div className="w-12 h-12 bg-orange-200 rounded-lg mx-auto mb-4 flex items-center justify-center">
+              <span className="text-2xl">👥</span>
+            </div>
+            <h3 className="font-semibold text-lg mb-2">Support Groups</h3>
+            <p className="text-gray-600 text-sm">Connect with others on similar recovery journeys</p>
+          </div>
+          
+          <div className="bg-teal-100 p-6 rounded-lg text-center">
+            <div className="w-12 h-12 bg-teal-200 rounded-lg mx-auto mb-4 flex items-center justify-center">
+              <span className="text-2xl">🌿</span>
+            </div>
+            <h3 className="font-semibold text-lg mb-2">Traditional Healing Practices</h3>
+            <p className="text-gray-600 text-sm">Complementary and alternative medicine options</p>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

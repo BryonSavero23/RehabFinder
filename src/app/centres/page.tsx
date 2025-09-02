@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Map from '@/components/Map'
 import { Centre, FilterState } from '@/lib/types'
 
 // Mock data - replace with actual API calls
@@ -22,7 +21,7 @@ const mockCentres: Centre[] = [
   {
     id: 2,
     name: 'Taman Pemulihan',
-    address: '56 Lorong Gungai, Penang',
+    address: '456 Lorong Gungai, Penang',
     latitude: 5.4141,
     longitude: 100.3288,
     phone: '+60 4-226 1234',
@@ -123,53 +122,66 @@ export default function CentresPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Page Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Find Rehab Centres Near You
-          </h1>
-          <p className="text-xl text-gray-600">
-            in Malaysia &amp; Thailand
-          </p>
-        </div>
+    <div className="min-h-screen bg-red-500">
+      {/* Hero Section */}
+      <div className="bg-white py-8">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="text-center mb-8">
+            <h1 className="text-4xl font-bold text-gray-900 mb-4">
+              TEST - Find Rehab Centres Near You
+            </h1>
+            <p className="text-xl text-gray-600">
+              in Malaysia & Thailand
+            </p>
+          </div>
 
-        {/* Search and Location */}
-        <div className="bg-white p-6 rounded-lg shadow mb-8">
-          <div className="flex flex-col md:flex-row gap-4 items-center">
-            <input
-              type="text"
-              placeholder="Enter location or centre name"
-              value={filters.search}
-              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-            />
+          {/* Search Section */}
+          <div className="max-w-4xl mx-auto flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <input
+                type="text"
+                placeholder="Enter location or centre name"
+                value={filters.search}
+                onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-lg"
+              />
+            </div>
             <button
               onClick={handleUseLocation}
               disabled={loadingLocation}
-              className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 disabled:bg-gray-400 whitespace-nowrap"
+              className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 disabled:bg-gray-400 flex items-center gap-2 whitespace-nowrap"
             >
-              {loadingLocation ? '📍 Finding your location...' : '🎯 Use My Location'}
+              <span className="text-lg">📍</span>
+              {loadingLocation ? 'Finding your location...' : 'Use My Location'}
             </button>
           </div>
-        </div>
 
+          {/* Location Status */}
+          {userLocation && (
+            <div className="mt-4 p-4 bg-green-100 text-green-800 rounded-lg max-w-md mx-auto text-center">
+              📍 Location found: {userLocation.lat.toFixed(4)}, {userLocation.lng.toFixed(4)}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="grid lg:grid-cols-4 gap-8">
           {/* Filters Sidebar */}
           <div className="lg:col-span-1">
-            <div className="bg-white p-6 rounded-lg shadow">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Filters</h2>
+            <div className="bg-white p-6 rounded-lg shadow-sm">
+              <h3 className="text-lg font-semibold mb-4">Filters</h3>
               
               {/* Country Filter */}
-              <div className="mb-4">
+              <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Country
                 </label>
                 <select
                   value={filters.country}
                   onChange={(e) => setFilters({ ...filters, country: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="Malaysia">Malaysia</option>
                   <option value="Thailand">Thailand</option>
@@ -177,43 +189,56 @@ export default function CentresPage() {
               </div>
 
               {/* State/Province Filter */}
-              <div className="mb-4">
+              <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   State / Province
                 </label>
-                <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="Penang">Penang</option>
+                <select className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                  <option value="Pemitary">Pemitary</option>
                   <option value="Selangor">Selangor</option>
+                  <option value="Penang">Penang</option>
                   <option value="Kuala Lumpur">Kuala Lumpur</option>
                 </select>
               </div>
 
               {/* Rehab Type Filter */}
-              <div className="mb-4">
+              <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Rehab Type
                 </label>
                 <div className="space-y-2">
-                  {['Inpatient', 'Outpatient', 'Traditional'].map(type => (
-                    <label key={type} className="flex items-center">
-                      <input
-                        type="radio"
-                        name="rehabType"
-                        value={type}
-                        checked={filters.type === type}
-                        onChange={(e) => setFilters({ ...filters, type: e.target.value })}
-                        className="mr-2"
-                      />
-                      {type}
-                    </label>
-                  ))}
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={filters.type === 'Inpatient'}
+                      onChange={(e) => setFilters({ ...filters, type: e.target.checked ? 'Inpatient' : '' })}
+                      className="mr-2 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    Inpatient
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={filters.type === 'Outpatient'}
+                      onChange={(e) => setFilters({ ...filters, type: e.target.checked ? 'Outpatient' : '' })}
+                      className="mr-2 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    Outpatient
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={filters.type === 'Traditional'}
+                      onChange={(e) => setFilters({ ...filters, type: e.target.checked ? 'Traditional' : '' })}
+                      className="mr-2 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    Traditional
+                  </label>
                 </div>
               </div>
 
               {/* Accessibility Filter */}
-              <div className="mb-4">
+              <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Accessibility
                 </label>
@@ -222,9 +247,14 @@ export default function CentresPage() {
                     type="checkbox"
                     checked={filters.accessibility}
                     onChange={(e) => setFilters({ ...filters, accessibility: e.target.checked })}
-                    className="mr-2"
+                    className="mr-2 w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                   />
-                  Wheelchair-friendly
+                  <span className="text-sm">Wheelchair-friendly</span>
+                  {filters.accessibility && (
+                    <div className="ml-2 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                      <span className="text-white text-xs">✓</span>
+                    </div>
+                  )}
                 </label>
               </div>
             </div>
@@ -232,26 +262,70 @@ export default function CentresPage() {
 
           {/* Main Content */}
           <div className="lg:col-span-3">
-            {/* Map */}
-            <div className="bg-white p-6 rounded-lg shadow mb-8">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Map View</h2>
-              <Map 
-                center={userLocation || undefined}
-                centres={filteredCentres.map(centre => ({
-                  name: centre.name,
-                  address: centre.address,
-                  lat: centre.latitude,
-                  lng: centre.longitude,
-                  type: centre.type
-                }))}
-              />
+            {/* Map Section */}
+            <div className="bg-white rounded-lg shadow-sm mb-8 overflow-hidden">
+              <div className="h-96 bg-gradient-to-br from-blue-200 via-green-200 to-blue-300 relative">
+                {/* Simplified Malaysia map representation */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="relative w-full h-full">
+                    {/* Main Peninsula */}
+                    <div className="absolute top-12 left-1/2 transform -translate-x-1/2 w-32 h-48 bg-green-300 rounded-bl-3xl rounded-br-lg opacity-80"></div>
+                    
+                    {/* Borneo-like shape */}
+                    <div className="absolute top-16 right-16 w-24 h-32 bg-green-400 rounded-2xl opacity-70"></div>
+                    
+                    {/* Location pins */}
+                    {filteredCentres.map((centre, index) => (
+                      <div 
+                        key={centre.id}
+                        className="absolute w-6 h-6 bg-blue-600 rounded-full border-2 border-white shadow-lg cursor-pointer hover:bg-blue-700 transition-colors"
+                        style={{ 
+                          top: `${25 + index * 15}%`, 
+                          left: `${45 + index * 10}%`, 
+                          transform: 'translate(-50%, -50%)' 
+                        }}
+                        title={centre.name}
+                      >
+                      </div>
+                    ))}
+                    
+                    {/* User location marker */}
+                    {userLocation && (
+                      <div 
+                        className="absolute w-4 h-4 bg-red-500 rounded-full border-2 border-white shadow-lg animate-pulse"
+                        style={{
+                          top: '45%',
+                          left: '50%',
+                          transform: 'translate(-50%, -50%)'
+                        }}
+                        title="Your Location"
+                      ></div>
+                    )}
+                    
+                    {/* Malaysia label */}
+                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white/90 px-3 py-1 rounded-lg shadow-sm">
+                      <span className="font-semibold text-gray-800">Malaysia</span>
+                    </div>
+
+                    {/* Map controls */}
+                    <div className="absolute top-4 right-4 flex flex-col space-y-2">
+                      <button className="w-8 h-8 bg-white border border-gray-300 rounded shadow flex items-center justify-center text-lg hover:bg-gray-50 font-bold">
+                        +
+                      </button>
+                      <button className="w-8 h-8 bg-white border border-gray-300 rounded shadow flex items-center justify-center text-lg hover:bg-gray-50 font-bold">
+                        −
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Nearest Rehab Centres */}
-            <div className="bg-white rounded-lg shadow">
+            <div className="bg-white rounded-lg shadow-sm">
               <div className="p-6 border-b">
-                <h2 className="text-xl font-bold text-gray-900">
-                  Nearest Rehab Centres ({filteredCentres.length} results)
+                <h2 className="text-xl font-semibold text-gray-900">
+                  Nearest Rehab Centres ({filteredCentres.length})
                 </h2>
               </div>
               
@@ -264,7 +338,7 @@ export default function CentresPage() {
                   return (
                     <div key={centre.id} className="p-6">
                       <div className="flex justify-between items-start mb-4">
-                        <div>
+                        <div className="flex-1">
                           <h3 className="text-lg font-semibold text-gray-900 mb-2">
                             {centre.name}
                           </h3>

@@ -32,7 +32,7 @@ export default function Map({ center, centres }: MapProps) {
           {centres?.map((centre, index) => (
             <div 
               key={index}
-              className="absolute w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center cursor-pointer hover:bg-blue-600 transition-colors"
+              className="absolute w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center cursor-pointer hover:bg-blue-600 transition-colors group"
               style={{
                 top: `${20 + index * 15}%`,
                 left: `${35 + index * 10}%`,
@@ -40,6 +40,12 @@ export default function Map({ center, centres }: MapProps) {
               title={centre.name}
             >
               <div className="w-2 h-2 bg-white rounded-full"></div>
+              
+              {/* Hover tooltip */}
+              <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
+                {centre.name}
+                <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-gray-900"></div>
+              </div>
             </div>
           ))}
           
@@ -58,12 +64,17 @@ export default function Map({ center, centres }: MapProps) {
           
           {/* Map controls */}
           <div className="absolute top-4 right-4 flex flex-col space-y-2">
-            <button className="w-8 h-8 bg-white border border-gray-300 rounded shadow flex items-center justify-center text-lg hover:bg-gray-50">
+            <button className="w-8 h-8 bg-white border border-gray-300 rounded shadow flex items-center justify-center text-lg hover:bg-gray-50 transition-colors font-semibold">
               +
             </button>
-            <button className="w-8 h-8 bg-white border border-gray-300 rounded shadow flex items-center justify-center text-lg hover:bg-gray-50">
+            <button className="w-8 h-8 bg-white border border-gray-300 rounded shadow flex items-center justify-center text-lg hover:bg-gray-50 transition-colors font-semibold">
               −
             </button>
+          </div>
+
+          {/* Malaysia label */}
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-lg shadow-sm">
+            <span className="font-semibold text-gray-800">Malaysia</span>
           </div>
         </div>
       </div>

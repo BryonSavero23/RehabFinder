@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 
 export default function Home() {
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null)
@@ -41,28 +42,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-sm">R</span>
-              </div>
-              <span className="font-bold text-xl text-gray-900">RehabFinder</span>
-            </div>
-            
-            {/* Navigation */}
-            <nav className="hidden md:flex space-x-6">
-              <a href="/" className="text-blue-500 font-medium">Home</a>
-              <a href="/centres" className="text-gray-600 hover:text-blue-500">Find Centres</a>
-              <a href="/resources" className="text-gray-600 hover:text-blue-500">Resources</a>
-              <a href="/contact" className="text-gray-600 hover:text-blue-500">Contact</a>
-            </nav>
-          </div>
-        </div>
-      </header>
-
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-8">
         {/* Hero Section */}
@@ -111,9 +90,9 @@ export default function Home() {
             <h2 className="text-2xl font-bold text-gray-900 mb-6">Nearest Centres</h2>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[
-                { name: 'Sunway Medical Centre', address: 'Bandar Sunway, Selangor', distance: '2.3 km', type: 'Private Hospital' },
-                { name: 'Hospital Sungai Buloh', address: 'Sungai Buloh, Selangor', distance: '4.1 km', type: 'Government Hospital' },
-                { name: 'NASAM Rehab Centre', address: 'Shah Alam, Selangor', distance: '5.8 km', type: 'NGO Centre' }
+                { name: 'Sunrise Rehabilitation Centre', address: '122 Jalan Petaling, Kuala Lumpur', distance: '2.5 km', type: 'Inpatient' },
+                { name: 'Taman Pemulihan', address: '56 Lorong Gungai, Penang', distance: '4.3 km', type: 'Outpatient' },
+                { name: 'Rehab Whisper', address: '789 Jalan Bahagia, Ipoh', distance: '5.1 km', type: 'Traditional' }
               ].map((centre, i) => (
                 <div key={i} className="bg-white p-6 rounded-lg shadow border">
                   <h3 className="font-semibold text-lg mb-2">{centre.name}</h3>
@@ -137,29 +116,56 @@ export default function Home() {
         )}
 
         {/* Quick Access Cards */}
-        <div className="grid md:grid-cols-3 gap-6">
-          <div className="bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow cursor-pointer">
-            <div className="text-3xl mb-3">🎥</div>
-            <h3 className="font-semibold mb-2">Exercise Videos</h3>
-            <p className="text-gray-600">Rehabilitation exercises and therapy guides</p>
+        <div className="mb-12">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">
+            How Can We Help?
+          </h2>
+          <div className="grid md:grid-cols-3 gap-6">
+            <Link href="/resources" className="bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow cursor-pointer">
+              <div className="text-3xl mb-3">🎥</div>
+              <h3 className="font-semibold mb-2">Exercise Videos</h3>
+              <p className="text-gray-600">Rehabilitation exercises and therapy guides</p>
+            </Link>
+            <Link href="/centres" className="bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow cursor-pointer">
+              <div className="text-3xl mb-3">📍</div>
+              <h3 className="font-semibold mb-2">Find Centres</h3>
+              <p className="text-gray-600">Locate nearby rehabilitation facilities</p>
+            </Link>
+            <Link href="/resources" className="bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow cursor-pointer">
+              <div className="text-3xl mb-3">📚</div>
+              <h3 className="font-semibold mb-2">Resources</h3>
+              <p className="text-gray-600">Helpful tools and comprehensive guides</p>
+            </Link>
           </div>
-          <div className="bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow cursor-pointer">
-            <div className="text-3xl mb-3">📍</div>
-            <h3 className="font-semibold mb-2">Find Centres</h3>
-            <p className="text-gray-600">Locate nearby rehabilitation facilities</p>
-          </div>
-          <div className="bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow cursor-pointer">
-            <div className="text-3xl mb-3">📚</div>
-            <h3 className="font-semibold mb-2">Resources</h3>
-            <p className="text-gray-600">Helpful tools and comprehensive guides</p>
-          </div>
+        </div>
+
+        {/* About Section */}
+        <div className="text-center mb-12">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            About RehabFinder
+          </h2>
+          <p className="text-gray-600 max-w-3xl mx-auto">
+            RehabFinder is your comprehensive guide to finding quality rehabilitation centres 
+            across Malaysia and Thailand. We help connect patients and families with the right 
+            care facilities, offering detailed information about services, accessibility, and 
+            expert reviews to make informed healthcare decisions.
+          </p>
         </div>
       </main>
 
       {/* Footer */}
       <footer className="bg-gray-900 text-white py-8 mt-16">
         <div className="max-w-7xl mx-auto px-4 text-center">
-          <p>&copy; 2024 RehabFinder - Health, Hope & Access</p>
+          <div className="mb-4">
+            <div className="flex items-center justify-center space-x-2 mb-2">
+              <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                <span className="text-white font-bold text-sm">R</span>
+              </div>
+              <span className="font-bold text-xl">RehabFinder</span>
+            </div>
+            <p className="text-gray-400">Health, Hope & Access</p>
+          </div>
+          <p className="text-gray-400">&copy; 2024 RehabFinder. All rights reserved.</p>
         </div>
       </footer>
     </div>

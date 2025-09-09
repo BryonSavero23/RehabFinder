@@ -361,21 +361,10 @@ export default function HomePage() {
           <div className="lg:col-span-3">
             {/* Map Section */}
             <div className="bg-white rounded-lg shadow-sm mb-8 overflow-hidden">
-              <div className="p-4 border-b border-gray-200">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-semibold text-gray-900">Center Locations</h3>
-                  {userLocation && (
-                    <div className="text-sm text-green-600 flex items-center gap-2">
-                      <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                      Your location detected
-                    </div>
-                  )}
-                </div>
-              </div>
               <div className="h-96">
                 <Map 
                   center={userLocation || undefined}
-                  centres={filteredCentres.slice(0, 20).map(centre => ({ // Limit to first 20 centers for performance
+                  centres={filteredCentres.map(centre => ({
                     name: centre.name,
                     address: centre.address,
                     lat: centre.latitude || 0,
@@ -384,116 +373,89 @@ export default function HomePage() {
                   }))}
                 />
               </div>
-              {!userLocation && (
-                <div className="p-4 bg-blue-50 border-t border-blue-200">
-                  <p className="text-blue-700 text-sm">
-                    💡 <strong>Tip:</strong> Click "Use My Location" above to see centers near you on the map
-                  </p>
-                </div>
-              )}
             </div>
 
-            {/* Centers Preview */}
+            {/* Centers List */}
             <div className="bg-white rounded-lg shadow-sm">
               <div className="p-6 border-b border-gray-200">
                 <div className="flex justify-between items-center">
                   <h2 className="text-xl font-semibold text-gray-900">
-                    Featured Rehabilitation Centers
+                    Rehabilitation Centers ({filteredCentres.length})
                   </h2>
-                  <a 
-                    href="/centres"
-                    className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors font-medium"
-                  >
-                    View All {centres.length} Centers
-                  </a>
+                  {filteredCentres.length > 6 && (
+                    <button
+                      onClick={() => setShowAllCenters(!showAllCenters)}
+                      className="text-blue-500 hover:text-blue-600 font-medium"
+                    >
+                      {showAllCenters ? 'Show Less' : `Show All ${filteredCentres.length}`}
+                    </button>
+                  )}
                 </div>
-                <p className="text-gray-600 text-sm mt-2">Discover some of our featured rehabilitation centers</p>
               </div>
               
               <div className="divide-y divide-gray-200">
-                {filteredCentres.length === 0 ? (
+                {displayedCentres.length === 0 ? (
                   <div className="p-8 text-center text-gray-500">
                     <p>No centers found matching your criteria.</p>
                     <p className="mt-2">Try adjusting your filters or search terms.</p>
-                    <a 
-                      href="/centres"
-                      className="inline-block mt-4 bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors"
-                    >
-                      Browse All Centers
-                    </a>
                   </div>
                 ) : (
-                  <>
-                    {displayedCentres.map((centre) => (
-                      <div key={centre.id} className="p-6 hover:bg-gray-50 transition-colors">
-                        <div className="flex justify-between items-start mb-3">
-                          <div>
-                            <h3 className="text-lg font-medium text-gray-900 mb-1">
-                              {centre.name}
-                            </h3>
-                            <p className="text-gray-600">{centre.address}</p>
-                          </div>
-                          <div className="flex flex-col items-end gap-2">
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                              {getCenterTypeName(centre.center_type_id)}
-                            </span>
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              {getCountryName(centre.country_id)}
-                            </span>
-                            {centre.accessibility && (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                                ♿ Accessible
-                              </span>
-                            )}
-                          </div>
+                  displayedCentres.map((centre) => (
+                    <div key={centre.id} className="p-6 hover:bg-gray-50 transition-colors">
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <h3 className="text-lg font-medium text-gray-900 mb-1">
+                            {centre.name}
+                          </h3>
+                          <p className="text-gray-600">{centre.address}</p>
                         </div>
-
-                        {centre.services && (
-                          <div className="mb-4">
-                            <p className="text-sm text-gray-600">
-                              <strong>Services:</strong> {centre.services}
-                            </p>
-                          </div>
-                        )}
-
-                        <div className="flex items-center gap-4 text-sm text-gray-600">
-                          {centre.phone && (
-                            <a href={`tel:${centre.phone}`} className="hover:text-blue-600">
-                              📞 {centre.phone}
-                            </a>
-                          )}
-                          {centre.email && (
-                            <a href={`mailto:${centre.email}`} className="hover:text-blue-600">
-                              ✉️ {centre.email}
-                            </a>
-                          )}
-                          {centre.website && (
-                            <a 
-                              href={centre.website.startsWith('http') ? centre.website : `https://${centre.website}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="hover:text-blue-600"
-                            >
-                              🌐 Website
-                            </a>
+                        <div className="flex flex-col items-end gap-2">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            {getCenterTypeName(centre.center_type_id)}
+                          </span>
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            {getCountryName(centre.country_id)}
+                          </span>
+                          {centre.accessibility && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                              ♿ Accessible
+                            </span>
                           )}
                         </div>
                       </div>
-                    ))}
-                    
-                    {/* View All Centers CTA */}
-                    <div className="p-6 bg-gray-50 text-center">
-                      <p className="text-gray-600 mb-4">
-                        Showing {displayedCentres.length} of {filteredCentres.length} centers
-                      </p>
-                      <a 
-                        href="/centres"
-                        className="inline-block bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors font-medium"
-                      >
-                        Explore All {centres.length} Rehabilitation Centers →
-                      </a>
+
+                      {centre.services && (
+                        <div className="mb-4">
+                          <p className="text-sm text-gray-600">
+                            <strong>Services:</strong> {centre.services}
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-4 text-sm text-gray-600">
+                        {centre.phone && (
+                          <a href={`tel:${centre.phone}`} className="hover:text-blue-600">
+                            📞 {centre.phone}
+                          </a>
+                        )}
+                        {centre.email && (
+                          <a href={`mailto:${centre.email}`} className="hover:text-blue-600">
+                            ✉️ {centre.email}
+                          </a>
+                        )}
+                        {centre.website && (
+                          <a 
+                            href={centre.website.startsWith('http') ? centre.website : `https://${centre.website}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:text-blue-600"
+                          >
+                            🌐 Website
+                          </a>
+                        )}
+                      </div>
                     </div>
-                  </>
+                  ))
                 )}
               </div>
             </div>

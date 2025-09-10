@@ -1,4 +1,8 @@
+// src/components/Map.tsx - REPLACE your existing Map component
 'use client'
+
+import { useState, useEffect } from 'react'
+import GoogleMap from './GoogleMap'
 
 interface MapProps {
   center?: { lat: number; lng: number }
@@ -8,12 +12,48 @@ interface MapProps {
     lat: number
     lng: number
     type: string
+    phone?: string
+    email?: string
+    website?: string
   }>
 }
 
 export default function Map({ center, centres }: MapProps) {
+  const [isClient, setIsClient] = useState(false)
+
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
+
+  // Check if Google Maps API key is configured
+  const hasApiKey = typeof window !== 'undefined' && process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+
+  // Don't render on server side to avoid hydration issues
+  if (!isClient) {
+    return (
+      <div className="w-full h-96 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mx-auto mb-2"></div>
+          <p className="text-gray-600 text-sm">Loading map...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show Google Maps if API key is available
+  if (hasApiKey) {
+    return (
+      <GoogleMap 
+        center={center}
+        centres={centres || []}
+        height="100%"
+      />
+    )
+  }
+
+  // Fallback to placeholder map if no API key
   return (
-    <div className="w-full h-96 bg-gradient-to-br from-blue-100 via-green-100 to-blue-200 rounded-lg border border-gray-200 relative overflow-hidden">
+    <div className="w-full h-full bg-gradient-to-br from-blue-100 via-green-100 to-blue-200 rounded-lg border border-gray-200 relative overflow-hidden">
       {/* Map Placeholder with Malaysia-like styling */}
       <div className="absolute inset-0 flex items-center justify-center">
         {/* Landmass shapes to simulate Malaysia */}
@@ -29,13 +69,13 @@ export default function Map({ center, centres }: MapProps) {
           <div className="absolute bottom-16 left-1/3 w-6 h-8 bg-green-200 rounded opacity-70"></div>
           
           {/* Centre markers */}
-          {centres?.map((centre, index) => (
+          {centres?.slice(0, 8).map((centre, index) => (
             <div 
               key={index}
               className="absolute w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center cursor-pointer hover:bg-blue-600 transition-colors group"
               style={{
-                top: `${20 + index * 15}%`,
-                left: `${35 + index * 10}%`,
+                top: `${20 + index * 8}%`,
+                left: `${35 + (index % 3) * 15}%`,
               }}
               title={centre.name}
             >

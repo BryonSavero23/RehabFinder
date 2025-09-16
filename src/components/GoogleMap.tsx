@@ -1,4 +1,4 @@
-// src/components/GoogleMap.tsx - CLEAN VERSION
+// src/components/GoogleMap.tsx - Enhanced version (drop-in replacement)
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
@@ -13,12 +13,15 @@ interface Centre {
   phone?: string
   email?: string
   website?: string
+  services?: string
 }
 
 interface GoogleMapProps {
   center?: { lat: number; lng: number }
   centres?: Centre[]
   height?: string
+  showControls?: boolean
+  onMarkerClick?: (centre: Centre) => void
 }
 
 declare global {
@@ -30,7 +33,9 @@ declare global {
 export default function GoogleMap({ 
   center, 
   centres = [], 
-  height = "400px" 
+  height = "400px",
+  showControls = true,
+  onMarkerClick
 }: GoogleMapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<any>(null)
@@ -89,19 +94,26 @@ export default function GoogleMap({
           {
             featureType: 'landscape',
             elementType: 'geometry',
-            stylers: [{ color: '#f5f5f5' }]
+            stylers: [{ color: '#f8f9fa' }]
+          },
+          {
+            featureType: 'poi',
+            elementType: 'geometry',
+            stylers: [{ color: '#f1f3f4' }]
           }
         ],
-        mapTypeControl: true,
-        streetViewControl: true,
-        fullscreenControl: true,
-        zoomControl: true,
+        mapTypeControl: showControls,
+        streetViewControl: showControls,
+        fullscreenControl: showControls,
+        zoomControl: showControls,
       })
 
       mapInstanceRef.current = map
 
-      // Add custom "My Location" button to the map
-      addLocationButton(map)
+      // Add custom "My Location" button to the map if controls enabled
+      if (showControls) {
+        addLocationButton(map)
+      }
 
       // Initialize geocoder
       geocoderRef.current = new window.google.maps.Geocoder()
@@ -145,17 +157,17 @@ export default function GoogleMap({
     controlUI.style.marginTop = '8px'
     controlUI.style.marginRight = '10px'
     controlUI.style.textAlign = 'center'
+    controlUI.style.width = '40px'
+    controlUI.style.height = '40px'
+    controlUI.style.display = 'flex'
+    controlUI.style.alignItems = 'center'
+    controlUI.style.justifyContent = 'center'
     controlUI.title = 'Click to get your current location'
     controlDiv.appendChild(controlUI)
     
     // Set CSS for the control interior
     const controlText = document.createElement('div')
-    controlText.style.color = 'rgb(25,25,25)'
-    controlText.style.fontFamily = 'Roboto,Arial,sans-serif'
-    controlText.style.fontSize = '16px'
-    controlText.style.lineHeight = '38px'
-    controlText.style.paddingLeft = '5px'
-    controlText.style.paddingRight = '5px'
+    controlText.style.fontSize = '18px'
     controlText.innerHTML = '📍'
     controlUI.appendChild(controlText)
     
@@ -270,6 +282,18 @@ export default function GoogleMap({
     })
 
     markersRef.current.push(userMarker)
+
+    userMarker.addListener('click', () => {
+      infoWindowRef.current.setContent(`
+        <div style="padding: 12px; font-family: Arial, sans-serif;">
+          <h3 style="margin: 0 0 8px 0; color: #4285F4;">📍 Your Location</h3>
+          <p style="margin: 0; color: #666; font-size: 13px;">
+            ${userLocation.lat.toFixed(6)}, ${userLocation.lng.toFixed(6)}
+          </p>
+        </div>
+      `)
+      infoWindowRef.current.open(map, userMarker)
+    })
   }
 
   const addCenterMarkersWithGeocoding = async (map: any, centers: Centre[]) => {
@@ -338,6 +362,14 @@ export default function GoogleMap({
     // Fit map to show all markers if no user location
     if (validCenters > 0 && !center) {
       map.fitBounds(bounds)
+      
+      // Prevent over-zooming for single markers
+      const listener = window.google.maps.event.addListener(map, 'idle', () => {
+        if (map.getZoom() > 15) {
+          map.setZoom(15)
+        }
+        window.google.maps.event.removeListener(listener)
+      })
     }
 
     console.log(`Total markers added: ${validCenters}`)
@@ -377,11 +409,11 @@ export default function GoogleMap({
       title: centre.name,
       icon: {
         path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-        scale: 5,
+        scale: 6,
         fillColor: getMarkerColor(centre.type),
         fillOpacity: 0.9,
         strokeColor: '#ffffff',
-        strokeWeight: 1
+        strokeWeight: 2
       }
     })
 
@@ -390,6 +422,10 @@ export default function GoogleMap({
     marker.addListener('click', () => {
       infoWindowRef.current.setContent(infoContent)
       infoWindowRef.current.open(map, marker)
+      
+      if (onMarkerClick) {
+        onMarkerClick(centre)
+      }
     })
 
     markersRef.current.push(marker)
@@ -398,43 +434,59 @@ export default function GoogleMap({
 
   const getMarkerColor = (type: string): string => {
     const colors: { [key: string]: string } = {
-      'Inpatient': '#e53e3e',
-      'Outpatient': '#38a169',
-      'Community': '#805ad5',
-      'Traditional': '#d69e2e',
-      'Specialist': '#3182ce',
+      'Inpatient': '#dc2626',     // Red
+      'Outpatient': '#059669',    // Green
+      'Community': '#7c3aed',     // Purple
+      'Traditional': '#d97706',   // Orange
+      'Specialist': '#2563eb',    // Blue
     }
-    return colors[type] || '#666666'
+    return colors[type] || '#6b7280' // Gray default
   }
 
   const createInfoWindowContent = (centre: Centre): string => {
     return `
-      <div style="padding: 12px; max-width: 300px; font-family: Arial, sans-serif;">
-        <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: bold; color: #333;">
+      <div style="padding: 14px; max-width: 320px; font-family: Arial, sans-serif; line-height: 1.4;">
+        <h3 style="margin: 0 0 10px 0; font-size: 16px; font-weight: bold; color: #1f2937;">
           ${centre.name}
         </h3>
-        <p style="margin: 0 0 6px 0; color: #666; font-size: 14px; line-height: 1.4;">
-          📍 ${centre.address}
-        </p>
-        <p style="margin: 0 0 8px 0; color: #888; font-size: 13px;">
-          🏥 <strong>Type:</strong> ${centre.type}
-        </p>
-        <div style="border-top: 1px solid #eee; padding-top: 8px; margin-top: 8px;">
+        
+        <div style="margin-bottom: 8px;">
+          <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 13px; display: flex; align-items: flex-start; gap: 6px;">
+            <span style="color: #374151;">📍</span>
+            <span>${centre.address}</span>
+          </p>
+        </div>
+
+        <div style="margin-bottom: 8px;">
+          <span style="background: ${getMarkerColor(centre.type)}; color: white; padding: 3px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;">
+            ${centre.type}
+          </span>
+        </div>
+
+        ${centre.services ? `
+          <p style="margin: 0 0 8px 0; color: #4b5563; font-size: 13px;">
+            <strong>Services:</strong> ${centre.services.substring(0, 100)}${centre.services.length > 100 ? '...' : ''}
+          </p>
+        ` : ''}
+
+        <div style="border-top: 1px solid #e5e7eb; padding-top: 8px; margin-top: 8px;">
           ${centre.phone ? `
             <p style="margin: 0 0 4px 0; font-size: 13px;">
-              📞 <a href="tel:${centre.phone}" style="color: #1976d2; text-decoration: none;">${centre.phone}</a>
+              📞 <a href="tel:${centre.phone}" style="color: #2563eb; text-decoration: none; font-weight: 500;">${centre.phone}</a>
             </p>
           ` : ''}
+          
           ${centre.email ? `
             <p style="margin: 0 0 4px 0; font-size: 13px;">
-              ✉️ <a href="mailto:${centre.email}" style="color: #1976d2; text-decoration: none;">${centre.email}</a>
+              ✉️ <a href="mailto:${centre.email}" style="color: #2563eb; text-decoration: none; font-weight: 500;">${centre.email}</a>
             </p>
           ` : ''}
+          
           ${centre.website ? `
             <p style="margin: 0; font-size: 13px;">
               🌐 <a href="${centre.website.startsWith('http') ? centre.website : `https://${centre.website}`}" 
                      target="_blank" rel="noopener noreferrer" 
-                     style="color: #1976d2; text-decoration: none;">Visit Website</a>
+                     style="color: #2563eb; text-decoration: none; font-weight: 500;">Visit Website</a>
             </p>
           ` : ''}
         </div>
@@ -451,6 +503,12 @@ export default function GoogleMap({
         <div className="text-center p-6">
           <div className="text-red-500 text-lg mb-2">⚠️ Map Error</div>
           <p className="text-red-700 text-sm">{error}</p>
+          <button 
+            onClick={() => initializeMap()}
+            className="mt-3 bg-red-500 text-white px-4 py-2 rounded text-sm hover:bg-red-600"
+          >
+            Retry
+          </button>
         </div>
       </div>
     )
@@ -459,22 +517,35 @@ export default function GoogleMap({
   return (
     <div className="w-full relative" style={{ height }}>
       {(isLoading || geocodingProgress.isActive) && (
-        <div className="absolute inset-0 bg-gray-100 bg-opacity-90 flex items-center justify-center z-10">
-          <div className="text-center bg-white p-4 rounded-lg shadow-lg">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+        <div className="absolute inset-0 bg-white bg-opacity-95 flex items-center justify-center z-20">
+          <div className="text-center bg-white p-6 rounded-lg shadow-lg border">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-3"></div>
+            
             {geocodingProgress.isActive ? (
               <div>
-                <p className="text-gray-800 text-sm font-medium">Converting addresses to map locations...</p>
-                <p className="text-gray-600 text-xs mt-1">
+                <h4 className="text-gray-900 text-sm font-semibold mb-2">Converting addresses to map locations...</h4>
+                <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                  <div 
+                    className="bg-blue-500 h-2 rounded-full transition-all duration-300" 
+                    style={{ 
+                      width: `${geocodingProgress.total > 0 ? (geocodingProgress.completed / geocodingProgress.total) * 100 : 0}%` 
+                    }}
+                  ></div>
+                </div>
+                <p className="text-gray-600 text-xs">
                   {geocodingProgress.completed} of {geocodingProgress.total} centers processed
                 </p>
               </div>
             ) : (
-              <p className="text-gray-600 text-sm">Loading Google Maps...</p>
+              <div>
+                <h4 className="text-gray-900 text-sm font-semibold mb-1">Loading Google Maps</h4>
+                <p className="text-gray-600 text-xs">Initializing map and markers...</p>
+              </div>
             )}
           </div>
         </div>
       )}
+      
       <div ref={mapRef} className="w-full h-full rounded-lg" />
     </div>
   )

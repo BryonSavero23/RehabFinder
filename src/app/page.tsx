@@ -1,52 +1,15 @@
-// src/app/page.tsx - Complete Homepage with all features
+// src/app/page.tsx - Enhanced Homepage with Same Map as Find Centers
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
-import Map from '@/components/Map'
-
-interface Centre {
-  id: string
-  name: string
-  address: string
-  latitude?: number
-  longitude?: number
-  phone?: string
-  email?: string
-  website?: string
-  services?: string
-  accessibility: boolean
-  country_id: string
-  center_type_id: string
-  active: boolean
-  verified: boolean
-  created_at: string
-}
-
-interface Country {
-  id: string
-  name: string
-  code: string
-}
-
-interface CenterType {
-  id: string
-  name: string
-  description: string
-}
-
-interface FilterState {
-  country: string
-  type: string
-  accessibility: boolean
-  search: string
-}
+import CenterMap from '@/components/CenterMap'
+import type { Centre, Country, CenterType, FilterState } from '@/types/center'
 
 export default function HomePage() {
   const [centres, setCentres] = useState<Centre[]>([])
   const [countries, setCountries] = useState<Country[]>([])
   const [centerTypes, setCenterTypes] = useState<CenterType[]>([])
-  const [filteredCentres, setFilteredCentres] = useState<Centre[]>([])
   const [filters, setFilters] = useState<FilterState>({
     country: '',
     type: '',
@@ -57,7 +20,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [loadingLocation, setLoadingLocation] = useState(false)
-  const [showAllCenters, setShowAllCenters] = useState(false)
+  const [selectedCenter, setSelectedCenter] = useState<Centre | null>(null)
 
   // Fetch data from database
   useEffect(() => {
@@ -103,35 +66,26 @@ export default function HomePage() {
   }
 
   // Filter centres based on current filters
-  useEffect(() => {
-    let filtered = centres
-
-    if (filters.search) {
-      filtered = filtered.filter(centre =>
+  const filteredCentres = useMemo(() => {
+    return centres.filter(centre => {
+      const matchesSearch = filters.search === '' || 
         centre.name.toLowerCase().includes(filters.search.toLowerCase()) ||
         centre.address.toLowerCase().includes(filters.search.toLowerCase()) ||
         (centre.services && centre.services.toLowerCase().includes(filters.search.toLowerCase()))
-      )
-    }
 
-    if (filters.country) {
-      filtered = filtered.filter(centre => centre.country_id === filters.country)
-    }
+      const matchesCountry = filters.country === '' || centre.country_id === filters.country
+      const matchesType = filters.type === '' || centre.center_type_id === filters.type
+      const matchesAccessibility = !filters.accessibility || centre.accessibility
 
-    if (filters.type) {
-      filtered = filtered.filter(centre => centre.center_type_id === filters.type)
-    }
+      return matchesSearch && matchesCountry && matchesType && matchesAccessibility
+    })
+  }, [centres, filters])
 
-    if (filters.accessibility) {
-      filtered = filtered.filter(centre => centre.accessibility)
-    }
+  const handleUseLocation = async () => {
+    if (loadingLocation) return
 
-    setFilteredCentres(filtered)
-  }, [filters, centres])
-
-  const handleUseLocation = () => {
     setLoadingLocation(true)
-    
+
     if (!navigator.geolocation) {
       alert('Geolocation is not supported by this browser.')
       setLoadingLocation(false)
@@ -152,26 +106,34 @@ export default function HomePage() {
       },
       {
         enableHighAccuracy: true,
-        timeout: 5000,
+        timeout: 10000,
         maximumAge: 0,
       }
     )
-  }
-
-  const getCountryName = (countryId: string) => {
-    return countries.find(c => c.id === countryId)?.name || 'Unknown'
   }
 
   const getCenterTypeName = (typeId: string) => {
     return centerTypes.find(t => t.id === typeId)?.name || 'Unknown'
   }
 
+  const getCountryName = (countryId: string) => {
+    return countries.find(c => c.id === countryId)?.name || 'Unknown'
+  }
+
+  const handleCenterClick = (center: Centre) => {
+    setSelectedCenter(center)
+    console.log('Selected center:', center.name)
+  }
+
+  // Get featured centers (first 6 for preview)
+  const featuredCentres = filteredCentres.slice(0, 6)
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading RehabFinder...</p>
+          <p className="text-gray-600">Loading rehabilitation centers...</p>
         </div>
       </div>
     )
@@ -193,8 +155,6 @@ export default function HomePage() {
       </div>
     )
   }
-
-  const displayedCentres = showAllCenters ? filteredCentres : filteredCentres.slice(0, 6)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -230,75 +190,84 @@ export default function HomePage() {
               className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 disabled:bg-gray-400 flex items-center gap-2 whitespace-nowrap"
             >
               <span className="text-lg">📍</span>
-              {loadingLocation ? 'Getting Location...' : 'Use My Location'}
+              {loadingLocation ? 'Finding Location...' : 'Use My Location'}
             </button>
           </div>
         </div>
       </div>
 
-      {/* Resources Section */}
-      <div className="bg-blue-50 py-16">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">Comprehensive Rehabilitation Resources</h2>
-            <p className="text-lg text-gray-600">Everything you need for your recovery journey</p>
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Comprehensive Rehabilitation Resources */}
+        <div className="mb-12">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">
+              Comprehensive Rehabilitation Resources
+            </h2>
+            <p className="text-xl text-gray-600">
+              Everything you need for your recovery journey
+            </p>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* Exercise Videos */}
-            <div className="bg-white rounded-lg p-6 text-center shadow-sm hover:shadow-md transition-shadow">
-              <div className="text-4xl mb-4">▶️</div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">Exercise Videos</h3>
-              <p className="text-gray-600 mb-4">Guided rehabilitation exercises and therapy routines</p>
-              <button className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors">
+            <div className="bg-white rounded-lg shadow-sm p-6 text-center">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-2xl">▶️</span>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Exercise Videos</h3>
+              <p className="text-gray-600 text-sm mb-4">Guided rehabilitation exercises and therapy routines</p>
+              <button className="bg-blue-500 text-white px-4 py-2 rounded text-sm hover:bg-blue-600">
                 Coming Soon
               </button>
             </div>
 
             {/* Downloadable Toolkits */}
-            <div className="bg-white rounded-lg p-6 text-center shadow-sm hover:shadow-md transition-shadow">
-              <div className="text-4xl mb-4">⬇️</div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">Downloadable Toolkits</h3>
-              <p className="text-gray-600 mb-4">Comprehensive resources for patients and families</p>
-              <button className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition-colors">
+            <div className="bg-white rounded-lg shadow-sm p-6 text-center">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-2xl">⬇️</span>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Downloadable Toolkits</h3>
+              <p className="text-gray-600 text-sm mb-4">Comprehensive resources for patients and families</p>
+              <button className="bg-green-500 text-white px-4 py-2 rounded text-sm hover:bg-green-600">
                 Coming Soon
               </button>
             </div>
 
             {/* Support Groups */}
-            <div className="bg-white rounded-lg p-6 text-center shadow-sm hover:shadow-md transition-shadow">
-              <div className="text-4xl mb-4">👥</div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">Support Groups</h3>
-              <p className="text-gray-600 mb-4">Connect with others on similar recovery journeys</p>
-              <button className="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600 transition-colors">
+            <div className="bg-white rounded-lg shadow-sm p-6 text-center">
+              <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-2xl">👥</span>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Support Groups</h3>
+              <p className="text-gray-600 text-sm mb-4">Connect with others on similar recovery journeys</p>
+              <button className="bg-purple-500 text-white px-4 py-2 rounded text-sm hover:bg-purple-600">
                 Coming Soon
               </button>
             </div>
 
-            {/* Traditional Healing */}
-            <div className="bg-white rounded-lg p-6 text-center shadow-sm hover:shadow-md transition-shadow">
-              <div className="text-4xl mb-4">🌿</div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">Traditional Healing Practices</h3>
-              <p className="text-gray-600 mb-4">Complementary and alternative medicine options</p>
-              <button className="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600 transition-colors">
+            {/* Traditional Healing Practices */}
+            <div className="bg-white rounded-lg shadow-sm p-6 text-center">
+              <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-2xl">🌿</span>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Traditional Healing Practices</h3>
+              <p className="text-gray-600 text-sm mb-4">Complementary and alternative medicine options</p>
+              <button className="bg-orange-500 text-white px-4 py-2 rounded text-sm hover:bg-orange-600">
                 Coming Soon
               </button>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Main Centers Content */}
-      <div className="max-w-7xl mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          
-          {/* Sidebar Filters */}
+        <div className="grid lg:grid-cols-4 gap-8">
+          {/* Filter Centers Sidebar */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-sm p-6 sticky top-8">
+            <div className="bg-white rounded-lg shadow-sm p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Filter Centers</h3>
-              
+
               {/* Country Filter */}
-              <div className="mb-6">
+              <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Country
                 </label>
@@ -316,8 +285,8 @@ export default function HomePage() {
                 </select>
               </div>
 
-              {/* Type Filter */}
-              <div className="mb-6">
+              {/* Center Type Filter */}
+              <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Center Type
                 </label>
@@ -353,35 +322,36 @@ export default function HomePage() {
                 <p className="text-sm text-gray-600">
                   Showing <strong>{filteredCentres.length}</strong> of <strong>{centres.length}</strong> centers
                 </p>
+                {userLocation && (
+                  <div className="text-sm text-green-600 flex items-center gap-2 mt-2">
+                    <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                    Your location detected
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
           {/* Main Content */}
           <div className="lg:col-span-3">
-            {/* Map Section */}
+            {/* Center Locations Map */}
             <div className="bg-white rounded-lg shadow-sm mb-8 overflow-hidden">
               <div className="p-4 border-b border-gray-200">
                 <div className="flex justify-between items-center">
                   <h3 className="text-lg font-semibold text-gray-900">Center Locations</h3>
-                  {userLocation && (
-                    <div className="text-sm text-green-600 flex items-center gap-2">
-                      <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                      Your location detected
-                    </div>
-                  )}
+                  <div className="text-sm text-gray-600">
+                    {filteredCentres.length} centers shown
+                  </div>
                 </div>
               </div>
               <div className="h-96">
-                <Map 
-                  center={userLocation || undefined}
-                  centres={filteredCentres.slice(0, 20).map(centre => ({ // Limit to first 20 centers for performance
-                    name: centre.name,
-                    address: centre.address,
-                    lat: centre.latitude || 0,
-                    lng: centre.longitude || 0,
-                    type: getCenterTypeName(centre.center_type_id)
-                  }))}
+                <CenterMap
+                  centers={filteredCentres}
+                  userLocation={userLocation}
+                  centerTypes={centerTypes}
+                  countries={countries}
+                  height="100%"
+                  onCenterClick={handleCenterClick}
                 />
               </div>
               {!userLocation && (
@@ -393,7 +363,7 @@ export default function HomePage() {
               )}
             </div>
 
-            {/* Centers Preview */}
+            {/* Featured Rehabilitation Centers */}
             <div className="bg-white rounded-lg shadow-sm">
               <div className="p-6 border-b border-gray-200">
                 <div className="flex justify-between items-center">
@@ -411,103 +381,121 @@ export default function HomePage() {
               </div>
               
               <div className="divide-y divide-gray-200">
-                {filteredCentres.length === 0 ? (
-                  <div className="p-8 text-center text-gray-500">
-                    <p>No centers found matching your criteria.</p>
-                    <p className="mt-2">Try adjusting your filters or search terms.</p>
-                    <a 
-                      href="/centres"
-                      className="inline-block mt-4 bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors"
+                {featuredCentres.length === 0 ? (
+                  <div className="p-8 text-center">
+                    <div className="text-gray-400 text-4xl mb-4">🔍</div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No centers found</h3>
+                    <p className="text-gray-600 mb-4">
+                      Try adjusting your search criteria or clearing your filters.
+                    </p>
+                    <button
+                      onClick={() => setFilters({ country: '', type: '', accessibility: false, search: '' })}
+                      className="text-blue-600 hover:text-blue-800 font-medium"
                     >
-                      Browse All Centers
-                    </a>
+                      Clear all filters
+                    </button>
                   </div>
                 ) : (
-                  <>
-                    {displayedCentres.map((centre) => (
-                      <div key={centre.id} className="p-6 hover:bg-gray-50 transition-colors">
-                        <div className="flex justify-between items-start mb-3">
-                          <div>
-                            <h3 className="text-lg font-medium text-gray-900 mb-1">
-                              {centre.name}
-                            </h3>
-                            <p className="text-gray-600">{centre.address}</p>
-                          </div>
-                          <div className="flex flex-col items-end gap-2">
+                  featuredCentres.map((centre) => (
+                    <div 
+                      key={centre.id} 
+                      className={`p-6 hover:bg-gray-50 transition-colors cursor-pointer ${
+                        selectedCenter?.id === centre.id ? 'bg-blue-50 border-l-4 border-blue-500' : ''
+                      }`}
+                      onClick={() => handleCenterClick(centre)}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                            {centre.name}
+                          </h3>
+                          
+                          <div className="flex items-center gap-3 mb-3">
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                               {getCenterTypeName(centre.center_type_id)}
                             </span>
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                               {getCountryName(centre.country_id)}
                             </span>
                             {centre.accessibility && (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                 ♿ Accessible
                               </span>
+                            )}
+                            {centre.verified && (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                ✓ Verified
+                              </span>
+                            )}
+                          </div>
+
+                          <p className="text-gray-600 mb-3">
+                            📍 {centre.address}
+                          </p>
+
+                          {centre.services && (
+                            <p className="text-gray-700 text-sm mb-3">
+                              <strong>Services:</strong> {centre.services.substring(0, 150)}
+                              {centre.services.length > 150 && '...'}
+                            </p>
+                          )}
+
+                          <div className="flex items-center gap-4 text-sm">
+                            {centre.phone && (
+                              <a 
+                                href={`tel:${centre.phone}`}
+                                className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                📞 {centre.phone}
+                              </a>
+                            )}
+                            {centre.email && (
+                              <a 
+                                href={`mailto:${centre.email}`}
+                                className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                ✉️ Email
+                              </a>
+                            )}
+                            {centre.website && (
+                              <a 
+                                href={centre.website.startsWith('http') ? centre.website : `https://${centre.website}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                🌐 Website
+                              </a>
                             )}
                           </div>
                         </div>
 
-                        {centre.services && (
-                          <div className="mb-4">
-                            <p className="text-sm text-gray-600">
-                              <strong>Services:</strong> {centre.services}
-                            </p>
-                          </div>
-                        )}
-
-                        <div className="flex items-center gap-4 text-sm text-gray-600">
-                          {centre.phone && (
-                            <a href={`tel:${centre.phone}`} className="hover:text-blue-600">
-                              📞 {centre.phone}
-                            </a>
+                        <div className="flex flex-col items-end gap-2">
+                          {centre.latitude && centre.longitude && (
+                            <span className="text-xs text-green-600 flex items-center gap-1">
+                              📍 Mapped
+                            </span>
                           )}
-                          {centre.email && (
-                            <a href={`mailto:${centre.email}`} className="hover:text-blue-600">
-                              ✉️ {centre.email}
-                            </a>
-                          )}
-                          {centre.website && (
-                            <a 
-                              href={centre.website.startsWith('http') ? centre.website : `https://${centre.website}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="hover:text-blue-600"
-                            >
-                              🌐 Website
-                            </a>
-                          )}
+                          <a
+                            href="/centres"
+                            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            View All Details
+                          </a>
                         </div>
                       </div>
-                    ))}
-                    
-                    {/* View All Centers CTA */}
-                    <div className="p-6 bg-gray-50 text-center">
-                      <p className="text-gray-600 mb-4">
-                        Showing {displayedCentres.length} of {filteredCentres.length} centers
-                      </p>
-                      <a 
-                        href="/centres"
-                        className="inline-block bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors font-medium"
-                      >
-                        Explore All {centres.length} Rehabilitation Centers →
-                      </a>
                     </div>
-                  </>
+                  ))
                 )}
               </div>
             </div>
           </div>
         </div>
       </div>
-
-      {/* Footer */}
-      <footer className="bg-gray-800 text-white py-8">
-        <div className="max-w-7xl mx-auto px-4 text-center">
-          <p className="text-gray-300">© 2024 RehabFinder. Connecting you to recovery resources in Malaysia & Thailand.</p>
-          <p className="text-gray-400 text-sm mt-2">Phase 1: Rehabilitation Centers Database • Phase 2: Exercise Videos Coming Soon</p>
-        </div>
-      </footer>
     </div>
   )
 }

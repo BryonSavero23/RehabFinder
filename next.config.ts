@@ -1,14 +1,13 @@
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
+  // Disable ESLint during build to allow deployment
   eslint: {
-    // Warning: This disables ESLint during production builds
     ignoreDuringBuilds: true,
   },
-  experimental: {
-    turbo: {
-      root: __dirname,
-    },
+  // Update turbo config as suggested by the warning
+  turbopack: {
+    root: __dirname,
   },
 }
 

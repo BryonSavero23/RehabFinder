@@ -1,7 +1,7 @@
-// src/app/admin/centers/[id]/page.tsx - Individual Center Edit Page
+// src/app/admin/centers/[id]/page.tsx - Enhanced with URL Validation
 'use client'
 
-import { useState, useEffect } from 'react'
+import { use, useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
@@ -37,11 +37,13 @@ interface CenterType {
 }
 
 interface EditCenterPageProps {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
-export default function EditCenterPage({ params }: EditCenterPageProps) {
+export default function EditCenterPage(props: EditCenterPageProps) {
   const router = useRouter()
+  const params = use(props.params)
+  const centerId = params.id
   const [center, setCenter] = useState<Centre | null>(null)
   const [countries, setCountries] = useState<Country[]>([])
   const [centerTypes, setCenterTypes] = useState<CenterType[]>([])
@@ -68,22 +70,19 @@ export default function EditCenterPage({ params }: EditCenterPageProps) {
   })
 
   useEffect(() => {
-    if (params.id) {
-      fetchData()
-    }
-  }, [params.id])
+    fetchData()
+  }, [centerId])
 
   const fetchData = async () => {
     try {
       setLoading(true)
       setError(null)
 
-      // Fetch center, countries, and types in parallel
       const [centerResult, countriesResult, typesResult] = await Promise.all([
         supabase
           .from('rehabilitation_centers')
           .select('*')
-          .eq('id', params.id)
+          .eq('id', centerId)
           .single(),
         supabase
           .from('countries')
@@ -108,12 +107,15 @@ export default function EditCenterPage({ params }: EditCenterPageProps) {
       if (typesResult.error) throw typesResult.error
 
       const centerData = centerResult.data
+      console.log('📥 Fetched center data from database:', centerData)
+      console.log('🌐 Website from database:', centerData.website)
+      console.log('🔄 Current form website value:', formData.website)
+      
       setCenter(centerData)
       setCountries(countriesResult.data || [])
       setCenterTypes(typesResult.data || [])
 
-      // Populate form with existing data
-      setFormData({
+      const newFormData = {
         name: centerData.name || '',
         address: centerData.address || '',
         latitude: centerData.latitude?.toString() || '',
@@ -127,10 +129,13 @@ export default function EditCenterPage({ params }: EditCenterPageProps) {
         center_type_id: centerData.center_type_id || '',
         active: centerData.active,
         verified: centerData.verified
-      })
+      }
+
+      console.log('📝 Setting form data website to:', newFormData.website)
+      setFormData(newFormData)
 
     } catch (err) {
-      console.error('Error fetching center:', err)
+      console.error('❌ Error fetching center:', err)
       setError(err instanceof Error ? err.message : 'Failed to load center data')
     } finally {
       setLoading(false)
@@ -142,7 +147,31 @@ export default function EditCenterPage({ params }: EditCenterPageProps) {
       ...prev,
       [field]: value
     }))
-    setSuccess(false) // Clear success message when user makes changes
+    setSuccess(false)
+    setError(null) // Clear error when user makes changes
+  }
+
+  // URL validation and formatting helper
+  const validateAndFormatUrl = (url: string): string | null => {
+    if (!url || !url.trim()) return null
+    
+    let formattedUrl = url.trim()
+    
+    // Remove any leading/trailing whitespace
+    formattedUrl = formattedUrl.replace(/\s+/g, '')
+    
+    // If URL doesn't start with http:// or https://, add https://
+    if (!formattedUrl.match(/^https?:\/\//i)) {
+      formattedUrl = 'https://' + formattedUrl
+    }
+    
+    // Basic URL validation
+    try {
+      new URL(formattedUrl)
+      return formattedUrl
+    } catch {
+      return null
+    }
   }
 
   const handleSave = async () => {
@@ -197,6 +226,18 @@ export default function EditCenterPage({ params }: EditCenterPageProps) {
         }
       }
 
+      // Validate and format website URL
+      let websiteUrl = null
+      if (formData.website.trim()) {
+        websiteUrl = validateAndFormatUrl(formData.website)
+        if (!websiteUrl) {
+          setError('Please enter a valid website URL (e.g., example.com or https://example.com)')
+          return
+        }
+      }
+
+      console.log('💾 Saving website URL:', websiteUrl)
+
       // Prepare update data
       const updateData = {
         name: formData.name.trim(),
@@ -205,7 +246,7 @@ export default function EditCenterPage({ params }: EditCenterPageProps) {
         longitude: longitude,
         phone: formData.phone.trim() || null,
         email: formData.email.trim() || null,
-        website: formData.website.trim() || null,
+        website: websiteUrl,
         services: formData.services.trim() || null,
         accessibility: formData.accessibility,
         country_id: formData.country_id,
@@ -214,20 +255,26 @@ export default function EditCenterPage({ params }: EditCenterPageProps) {
         verified: formData.verified
       }
 
-      const { error: updateError } = await supabase
+      console.log('💾 Update data being sent:', updateData)
+
+      const { data: updatedData, error: updateError } = await supabase
         .from('rehabilitation_centers')
         .update(updateData)
-        .eq('id', params.id)
+        .eq('id', centerId)
+        .select()
 
       if (updateError) throw updateError
 
+      console.log('✅ Data saved successfully:', updatedData)
+
+      // Refresh the data from database to show the updated values
+      await fetchData()
+
       setSuccess(true)
-      
-      // Optionally redirect back to centers list after successful save
-      // router.push('/admin/centers')
+      setTimeout(() => setSuccess(false), 3000)
 
     } catch (err) {
-      console.error('Error updating center:', err)
+      console.error('❌ Error updating center:', err)
       setError(err instanceof Error ? err.message : 'Failed to update center')
     } finally {
       setSaving(false)
@@ -246,11 +293,10 @@ export default function EditCenterPage({ params }: EditCenterPageProps) {
       const { error: deleteError } = await supabase
         .from('rehabilitation_centers')
         .delete()
-        .eq('id', params.id)
+        .eq('id', centerId)
 
       if (deleteError) throw deleteError
 
-      // Redirect to centers list after deletion
       router.push('/admin/centers')
 
     } catch (err) {
@@ -300,51 +346,48 @@ export default function EditCenterPage({ params }: EditCenterPageProps) {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
-        <div className="max-w-4xl mx-auto px-4 py-6">
+        <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 mb-2">
                 <Link 
                   href="/admin/centers"
                   className="text-blue-600 hover:text-blue-800"
                 >
                   ← Centers
                 </Link>
-                <h1 className="text-3xl font-bold text-gray-900">Edit Center</h1>
               </div>
+              <h1 className="text-3xl font-bold text-gray-900">Edit Center</h1>
               <p className="text-gray-600 mt-1">{center?.name}</p>
             </div>
-            
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleDelete}
-                disabled={saving}
-                className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 disabled:opacity-50"
-              >
-                🗑️ Delete
-              </button>
-            </div>
+            <button
+              onClick={handleDelete}
+              disabled={saving}
+              className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 disabled:opacity-50"
+            >
+              🗑️ Delete Center
+            </button>
           </div>
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Success Message */}
         {success && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+          <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
             <div className="flex items-center gap-2">
-              <span className="text-green-600">✅</span>
-              <span className="text-green-800 font-medium">Center updated successfully!</span>
+              <span className="text-green-600 text-xl">✅</span>
+              <p className="text-green-800 font-medium">Changes saved successfully!</p>
             </div>
           </div>
         )}
 
         {/* Error Message */}
         {error && center && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
             <div className="flex items-center gap-2">
-              <span className="text-red-600">⚠️</span>
-              <span className="text-red-800 font-medium">{error}</span>
+              <span className="text-red-600 text-xl">⚠️</span>
+              <p className="text-red-800 font-medium">{error}</p>
             </div>
           </div>
         )}
@@ -353,44 +396,24 @@ export default function EditCenterPage({ params }: EditCenterPageProps) {
           {/* Main Form */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-lg shadow-sm border p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-6">Center Details</h2>
-              
-              <div className="space-y-6">
-                {/* Basic Information */}
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Center Name *
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.name}
-                      onChange={(e) => handleInputChange('name', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                      placeholder="Enter center name"
-                    />
-                  </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-6">Center Details</h3>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Center Type *
-                    </label>
-                    <select
-                      value={formData.center_type_id}
-                      onChange={(e) => handleInputChange('center_type_id', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                    >
-                      <option value="">Select type</option>
-                      {centerTypes.map((type) => (
-                        <option key={type.id} value={type.id}>
-                          {type.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+              <div className="space-y-6">
+                {/* Name */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Center Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => handleInputChange('name', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    placeholder="Enter center name"
+                  />
                 </div>
 
-                {/* Address & Location */}
+                {/* Address */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Address *
@@ -404,7 +427,8 @@ export default function EditCenterPage({ params }: EditCenterPageProps) {
                   />
                 </div>
 
-                <div className="grid md:grid-cols-3 gap-4">
+                {/* Country and Type */}
+                <div className="grid md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Country *
@@ -414,8 +438,8 @@ export default function EditCenterPage({ params }: EditCenterPageProps) {
                       onChange={(e) => handleInputChange('country_id', e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                     >
-                      <option value="">Select country</option>
-                      {countries.map((country) => (
+                      <option value="">Select Country</option>
+                      {countries.map(country => (
                         <option key={country.id} value={country.id}>
                           {country.name}
                         </option>
@@ -425,6 +449,27 @@ export default function EditCenterPage({ params }: EditCenterPageProps) {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Center Type *
+                    </label>
+                    <select
+                      value={formData.center_type_id}
+                      onChange={(e) => handleInputChange('center_type_id', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    >
+                      <option value="">Select Type</option>
+                      {centerTypes.map(type => (
+                        <option key={type.id} value={type.id}>
+                          {type.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Coordinates */}
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       Latitude
                     </label>
                     <input
@@ -432,7 +477,7 @@ export default function EditCenterPage({ params }: EditCenterPageProps) {
                       value={formData.latitude}
                       onChange={(e) => handleInputChange('latitude', e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                      placeholder="e.g. 3.1390"
+                      placeholder="e.g., 3.1390"
                     />
                   </div>
 
@@ -445,23 +490,23 @@ export default function EditCenterPage({ params }: EditCenterPageProps) {
                       value={formData.longitude}
                       onChange={(e) => handleInputChange('longitude', e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                      placeholder="e.g. 101.6869"
+                      placeholder="e.g., 101.6869"
                     />
                   </div>
                 </div>
 
-                {/* Contact Information */}
-                <div className="grid md:grid-cols-3 gap-4">
+                {/* Contact Info */}
+                <div className="grid md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Phone
                     </label>
                     <input
-                      type="text"
+                      type="tel"
                       value={formData.phone}
                       onChange={(e) => handleInputChange('phone', e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                      placeholder="e.g. +60 3-1234 5678"
+                      placeholder="e.g., +60 3-1234 5678"
                     />
                   </div>
 
@@ -474,22 +519,26 @@ export default function EditCenterPage({ params }: EditCenterPageProps) {
                       value={formData.email}
                       onChange={(e) => handleInputChange('email', e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                      placeholder="contact@center.com"
+                      placeholder="e.g., info@center.com"
                     />
                   </div>
+                </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Website
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.website}
-                      onChange={(e) => handleInputChange('website', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                      placeholder="https://website.com"
-                    />
-                  </div>
+                {/* Website with validation hint */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Website
+                  </label>
+                  <input
+                    type="url"
+                    value={formData.website}
+                    onChange={(e) => handleInputChange('website', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    placeholder="e.g., example.com or https://example.com"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    💡 Tip: Enter just the domain (e.g., "hospital.com") or full URL (e.g., "https://hospital.com")
+                  </p>
                 </div>
 
                 {/* Services */}
@@ -555,7 +604,7 @@ export default function EditCenterPage({ params }: EditCenterPageProps) {
 
           {/* Sidebar Info */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-sm border p-6">
+            <div className="bg-white rounded-lg shadow-sm border p-6 sticky top-4">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Center Information</h3>
               
               <div className="space-y-3 text-sm">
@@ -568,7 +617,7 @@ export default function EditCenterPage({ params }: EditCenterPageProps) {
                 
                 <div>
                   <span className="text-gray-600">ID:</span>
-                  <span className="ml-2 font-mono text-xs text-gray-500">{center?.id}</span>
+                  <span className="ml-2 font-mono text-xs text-gray-500 break-all">{center?.id}</span>
                 </div>
 
                 <div>
@@ -598,23 +647,18 @@ export default function EditCenterPage({ params }: EditCenterPageProps) {
               <div className="mt-6 pt-4 border-t border-gray-200">
                 <h4 className="text-sm font-medium text-gray-900 mb-3">Quick Actions</h4>
                 <div className="space-y-2">
-                  <button
-                    onClick={() => handleInputChange('verified', !formData.verified)}
-                    className="w-full text-left px-3 py-2 text-sm bg-gray-50 hover:bg-gray-100 rounded border"
-                  >
-                    {formData.verified ? '❌ Mark Unverified' : '✅ Mark Verified'}
-                  </button>
-                  <button
-                    onClick={() => handleInputChange('active', !formData.active)}
-                    className="w-full text-left px-3 py-2 text-sm bg-gray-50 hover:bg-gray-100 rounded border"
-                  >
-                    {formData.active ? '⏸ Deactivate' : '▶ Activate'}
-                  </button>
                   <Link
                     href={`/admin/geocoding`}
                     className="block w-full text-left px-3 py-2 text-sm bg-gray-50 hover:bg-gray-100 rounded border"
                   >
                     🗺️ Add Coordinates
+                  </Link>
+                  <Link
+                    href="/"
+                    target="_blank"
+                    className="block w-full text-left px-3 py-2 text-sm bg-gray-50 hover:bg-gray-100 rounded border"
+                  >
+                    👁️ View on Public Site
                   </Link>
                 </div>
               </div>

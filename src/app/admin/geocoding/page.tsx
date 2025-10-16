@@ -1,9 +1,8 @@
-// src/app/admin/geocoding/page.tsx - Fixed version without multiple API loading
+// src/app/admin/geocoding/page.tsx - Smart Geocoding with Google Places
 'use client'
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import googleMapsLoader from '@/lib/googleMapsLoader'
 import Link from 'next/link'
 
 interface Centre {
@@ -27,6 +26,8 @@ interface GeocodingResult {
   success: boolean
   lat?: number
   lng?: number
+  address?: string
+  method?: string
   error?: string
 }
 
@@ -38,7 +39,7 @@ interface GeocodingStats {
   isRunning: boolean
 }
 
-export default function AdminGeocodingPage() {
+export default function SmartGeocodingPage() {
   const [centers, setCenters] = useState<Centre[]>([])
   const [countries, setCountries] = useState<Country[]>([])
   const [stats, setStats] = useState<GeocodingStats>({
@@ -52,31 +53,43 @@ export default function AdminGeocodingPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedCountry, setSelectedCountry] = useState<string>('')
-  const [batchSize, setBatchSize] = useState(5)
-  const [apiKeyStatus, setApiKeyStatus] = useState<'checking' | 'valid' | 'missing' | 'invalid'>('checking')
-  const [geocoder, setGeocoder] = useState<any>(null)
+  const [batchSize, setBatchSize] = useState(10)
+  const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false)
+  const [includeExisting, setIncludeExisting] = useState(false) // NEW: Include centers with coordinates
 
   useEffect(() => {
-    initializeGeocoder()
+    loadGoogleMaps()
     fetchData()
-  }, [])
+  }, [includeExisting]) // Re-fetch when includeExisting changes
 
-  const initializeGeocoder = async () => {
+  const loadGoogleMaps = async () => {
     try {
-      setApiKeyStatus('checking')
+      const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+      if (!apiKey) {
+        throw new Error('Google Maps API key not configured')
+      }
+
+      if (window.google?.maps) {
+        setGoogleMapsLoaded(true)
+        return
+      }
+
+      const script = document.createElement('script')
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geocoding`
+      script.async = true
+      script.defer = true
       
-      // Use centralized loader to prevent multiple loading
-      await googleMapsLoader.loadGoogleMaps()
+      script.onload = () => {
+        setGoogleMapsLoaded(true)
+      }
       
-      // Create geocoder instance
-      const geocoderInstance = googleMapsLoader.createGeocoder()
-      setGeocoder(geocoderInstance)
-      setApiKeyStatus('valid')
+      script.onerror = () => {
+        setError('Failed to load Google Maps API')
+      }
       
+      document.head.appendChild(script)
     } catch (err) {
-      console.error('Failed to initialize geocoder:', err)
-      setApiKeyStatus(err instanceof Error && err.message.includes('not configured') ? 'missing' : 'invalid')
-      setError(err instanceof Error ? err.message : 'Failed to initialize geocoder')
+      setError(err instanceof Error ? err.message : 'Failed to initialize')
     }
   }
 
@@ -84,13 +97,20 @@ export default function AdminGeocodingPage() {
     try {
       setLoading(true)
       
+      // Build query based on includeExisting flag
+      let query = supabase
+        .from('rehabilitation_centers')
+        .select('id, name, address, latitude, longitude, country_id')
+        .eq('active', true)
+        .order('name')
+      
+      // Only filter for null coordinates if NOT including existing
+      if (!includeExisting) {
+        query = query.is('latitude', null)
+      }
+
       const [centersResult, countriesResult] = await Promise.all([
-        supabase
-          .from('rehabilitation_centers')
-          .select('id, name, address, latitude, longitude, country_id')
-          .is('latitude', null)
-          .eq('active', true)
-          .order('name'),
+        query,
         supabase
           .from('countries')
           .select('*')
@@ -117,46 +137,96 @@ export default function AdminGeocodingPage() {
     ? centers.filter(center => center.country_id === selectedCountry)
     : centers
 
-  // Real Google Maps Geocoding function using the centralized loader
-  const realGeocode = async (address: string, countryName: string): Promise<{ lat: number; lng: number } | null> => {
-    if (!geocoder) {
-      throw new Error('Geocoder not initialized')
+  // Smart geocoding: Try Google Places first, then fall back to geocoding
+  const smartGeocode = async (centerName: string, address: string, countryName: string, countryCode: string) => {
+    if (!window.google?.maps) {
+      throw new Error('Google Maps not loaded')
     }
 
-    return new Promise((resolve, reject) => {
-      const fullAddress = `${address}, ${countryName}`
+    // Method 1: Try Google Places Search (finds businesses by name)
+    try {
+      console.log(`🔍 Searching Google Places for: "${centerName}"`)
       
-      geocoder.geocode(
-        { 
-          address: fullAddress,
-          region: countryName === 'Malaysia' ? 'MY' : countryName === 'Thailand' ? 'TH' : undefined
-        },
-        (results: any[], status: any) => {
-          if (status === 'OK' && results && results.length > 0) {
-            const location = results[0].geometry.location
-            resolve({
-              lat: location.lat(),
-              lng: location.lng()
-            })
-          } else if (status === 'ZERO_RESULTS') {
-            resolve(null)
-          } else if (status === 'OVER_QUERY_LIMIT') {
-            reject(new Error('Google Maps API quota exceeded. Please try again later.'))
-          } else if (status === 'REQUEST_DENIED') {
-            reject(new Error('Geocoding request denied. Check your API key permissions.'))
-          } else if (status === 'INVALID_REQUEST') {
-            reject(new Error('Invalid geocoding request.'))
-          } else {
-            reject(new Error(`Geocoding failed: ${status}`))
-          }
-        }
+      const service = new window.google.maps.places.PlacesService(
+        document.createElement('div')
       )
-    })
+
+      const placesResult = await new Promise<any>((resolve, reject) => {
+        service.textSearch(
+          {
+            query: `${centerName} ${countryName}`,
+            type: 'hospital'
+          },
+          (results: any[], status: any) => {
+            if (status === 'OK' && results && results.length > 0) {
+              const place = results[0]
+              console.log('✅ Found place:', place.name, place.formatted_address)
+              resolve({
+                name: place.name, // NEW: Include the official name from Google
+                lat: place.geometry.location.lat(),
+                lng: place.geometry.location.lng(),
+                address: place.formatted_address,
+                method: 'Google Places Search'
+              })
+            } else {
+              console.log('❌ Place not found, trying geocoding...')
+              resolve(null)
+            }
+          }
+        )
+      })
+
+      if (placesResult) return placesResult
+
+    } catch (err) {
+      console.error('Places search failed:', err)
+    }
+
+    // Method 2: Fall back to regular geocoding
+    try {
+      console.log(`🗺️ Geocoding address: "${address}"`)
+      
+      const geocoder = new window.google.maps.Geocoder()
+      
+      const geocodeResult = await new Promise<any>((resolve, reject) => {
+        geocoder.geocode(
+          {
+            address: `${address}, ${countryName}`,
+            region: countryCode
+          },
+          (results: any[], status: any) => {
+            if (status === 'OK' && results && results.length > 0) {
+              const result = results[0]
+              console.log('✅ Geocoded:', result.formatted_address)
+              
+              resolve({
+                lat: result.geometry.location.lat(),
+                lng: result.geometry.location.lng(),
+                address: result.formatted_address,
+                method: 'Geocoding'
+              })
+            } else if (status === 'ZERO_RESULTS') {
+              resolve(null)
+            } else if (status === 'OVER_QUERY_LIMIT') {
+              reject(new Error('Google Maps quota exceeded'))
+            } else {
+              reject(new Error(`Geocoding failed: ${status}`))
+            }
+          }
+        )
+      })
+
+      return geocodeResult
+
+    } catch (err) {
+      console.error('Geocoding failed:', err)
+      throw err
+    }
   }
 
-  const startBatchGeocode = async () => {
-    if (!geocoder) {
-      alert('Geocoder not initialized. Please check your Google Maps API key.')
+  const startSmartGeocode = async () => {
+    if (!googleMapsLoaded) {
+      alert('Google Maps is still loading. Please wait...')
       return
     }
 
@@ -166,64 +236,77 @@ export default function AdminGeocodingPage() {
       return
     }
 
-    setStats(prev => ({
-      ...prev,
-      isRunning: true,
+    setStats({
+      total: centersToProcess.length,
       processed: 0,
       successful: 0,
       failed: 0,
-      total: centersToProcess.length
-    }))
+      isRunning: true
+    })
     setResults([])
 
-    // Process centers one by one to avoid rate limiting
     for (let i = 0; i < centersToProcess.length; i++) {
       const center = centersToProcess[i]
       const country = countries.find(c => c.id === center.country_id)
       
+      if (!country) {
+        console.error(`Country not found for center ${center.name}`)
+        continue
+      }
+
       try {
         // Add delay to respect Google's rate limits
         if (i > 0) {
-          await new Promise(resolve => setTimeout(resolve, 200)) // Increased delay
+          await new Promise(resolve => setTimeout(resolve, 300))
         }
 
-        const coords = await realGeocode(center.address, country?.name || 'Malaysia')
-        
-        if (coords) {
-          // Update database
+        const result = await smartGeocode(
+          center.name,
+          center.address,
+          country.name,
+          country.code
+        )
+
+        if (result) {
+          // Update database with coordinates, address AND correct name from Google
           const { error: updateError } = await supabase
             .from('rehabilitation_centers')
             .update({
-              latitude: coords.lat,
-              longitude: coords.lng
+              name: result.name || center.name, // Update name if Google provided one
+              latitude: result.lat,
+              longitude: result.lng,
+              address: result.address
             })
             .eq('id', center.id)
 
           if (updateError) throw updateError
 
-          const result: GeocodingResult = {
+          const geocodeResult: GeocodingResult = {
             centerId: center.id,
-            centerName: center.name,
+            centerName: result.name || center.name, // Show the updated name
             success: true,
-            lat: coords.lat,
-            lng: coords.lng
+            lat: result.lat,
+            lng: result.lng,
+            address: result.address,
+            method: result.method
           }
 
-          setResults(prev => [...prev, result])
+          setResults(prev => [...prev, geocodeResult])
           setStats(prev => ({
             ...prev,
             processed: i + 1,
             successful: prev.successful + 1
           }))
+
         } else {
-          const result: GeocodingResult = {
+          const geocodeResult: GeocodingResult = {
             centerId: center.id,
             centerName: center.name,
             success: false,
-            error: 'Address not found'
+            error: 'Location not found'
           }
 
-          setResults(prev => [...prev, result])
+          setResults(prev => [...prev, geocodeResult])
           setStats(prev => ({
             ...prev,
             processed: i + 1,
@@ -232,32 +315,30 @@ export default function AdminGeocodingPage() {
         }
 
       } catch (err) {
-        console.error(`Geocoding failed for ${center.name}:`, err)
+        console.error(`Failed to geocode ${center.name}:`, err)
         
-        const result: GeocodingResult = {
+        const geocodeResult: GeocodingResult = {
           centerId: center.id,
           centerName: center.name,
           success: false,
           error: err instanceof Error ? err.message : 'Unknown error'
         }
 
-        setResults(prev => [...prev, result])
+        setResults(prev => [...prev, geocodeResult])
         setStats(prev => ({
           ...prev,
           processed: i + 1,
           failed: prev.failed + 1
         }))
 
-        // If we hit quota limits, stop processing
         if (err instanceof Error && err.message.includes('quota exceeded')) {
+          alert('Google Maps quota exceeded. Stopping...')
           break
         }
       }
     }
 
     setStats(prev => ({ ...prev, isRunning: false }))
-    
-    // Refresh data to update the list
     await fetchData()
   }
 
@@ -266,37 +347,7 @@ export default function AdminGeocodingPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center p-8">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading centers needing geocoding...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (error && apiKeyStatus !== 'valid') {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center p-8 max-w-2xl">
-          <div className="text-red-500 text-xl mb-4">⚠️ Google Maps API Setup Required</div>
-          <div className="bg-white rounded-lg p-6 shadow-sm border text-left">
-            <h3 className="font-semibold text-gray-900 mb-4">To enable real geocoding, please:</h3>
-            <ol className="list-decimal list-inside space-y-2 text-gray-700 mb-4">
-              <li>Get a Google Maps API key from the <a href="https://console.cloud.google.com/" target="_blank" className="text-blue-600 hover:underline">Google Cloud Console</a></li>
-              <li>Enable the "Geocoding API" for your project</li>
-              <li>Add the API key to your environment variables as <code className="bg-gray-100 px-2 py-1 rounded">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code></li>
-              <li>Restart your development server</li>
-            </ol>
-            <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
-              <p className="text-sm text-yellow-800">
-                <strong>Current Error:</strong> {error}
-              </p>
-            </div>
-          </div>
-          <button 
-            onClick={() => window.location.reload()}
-            className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-          >
-            Retry After Setup
-          </button>
+          <p className="text-gray-600">Loading centers...</p>
         </div>
       </div>
     )
@@ -309,30 +360,16 @@ export default function AdminGeocodingPage() {
         <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Real Geocoding Centers</h1>
+              <h1 className="text-3xl font-bold text-gray-900">🔍 Smart Geocoding</h1>
               <p className="text-gray-600 mt-1">
-                Add coordinates to {centers.length} centers using Google Maps API
+                Find {centers.length} centers using Google Places & Maps
               </p>
-              <div className="flex items-center gap-4 mt-2">
-                {apiKeyStatus === 'valid' && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-green-600">✅</span>
-                    <span className="text-sm text-green-700">Google Maps API connected</span>
-                  </div>
-                )}
-                {apiKeyStatus === 'checking' && (
-                  <div className="flex items-center gap-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-                    <span className="text-sm text-gray-600">Checking API connection...</span>
-                  </div>
-                )}
-              </div>
             </div>
             <Link 
-              href="/admin/centers" 
+              href="/admin" 
               className="text-blue-600 hover:text-blue-800"
             >
-              ← Back to Centers
+              ← Back to Admin
             </Link>
           </div>
         </div>
@@ -340,188 +377,263 @@ export default function AdminGeocodingPage() {
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Controls */}
+          {/* Control Panel */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-sm border p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Batch Geocoding</h3>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Filter by Country
-                  </label>
-                  <select
-                    value={selectedCountry}
-                    onChange={(e) => setSelectedCountry(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">All Countries</option>
-                    {countries.map((country) => (
-                      <option key={country.id} value={country.id}>
-                        {country.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+            <div className="bg-white rounded-lg shadow-sm border p-6 sticky top-4">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Settings</h3>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Batch Size (respect API limits)
-                  </label>
-                  <select
-                    value={batchSize}
-                    onChange={(e) => setBatchSize(Number(e.target.value))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value={5}>5 centers</option>
-                    <option value={10}>10 centers</option>
-                    <option value={20}>20 centers</option>
-                    <option value={50}>50 centers (max)</option>
-                  </select>
+              {/* Google Maps Status */}
+              <div className="mb-4 p-3 rounded-lg bg-blue-50 border border-blue-200">
+                <div className="flex items-center gap-2">
+                  {googleMapsLoaded ? (
+                    <>
+                      <span className="text-green-600 text-xl">✅</span>
+                      <span className="text-sm text-green-800 font-medium">Google Maps Ready</span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                      <span className="text-sm text-blue-800">Loading Google Maps...</span>
+                    </>
+                  )}
                 </div>
+              </div>
 
-                <div className="pt-4 border-t">
-                  <button
-                    onClick={startBatchGeocode}
-                    disabled={stats.isRunning || filteredCenters.length === 0 || apiKeyStatus !== 'valid'}
-                    className="w-full bg-blue-500 text-white py-3 px-4 rounded-lg hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium"
-                  >
-                    {stats.isRunning 
-                      ? `Geocoding... (${stats.processed}/${stats.total})`
-                      : `🗺️ Start Geocoding (${Math.min(filteredCenters.length, batchSize)} centers)`
-                    }
-                  </button>
-                </div>
-
-                {/* Progress Stats */}
-                {stats.isRunning && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h4 className="font-medium text-blue-900 mb-2">Progress</h4>
-                    <div className="w-full bg-blue-200 rounded-full h-2 mb-3">
-                      <div 
-                        className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                        style={{ 
-                          width: `${stats.total > 0 ? (stats.processed / stats.total) * 100 : 0}%` 
-                        }}
-                      ></div>
+              {/* IMPORTANT: Include Existing Coordinates Toggle */}
+              <div className="mb-4 p-4 bg-yellow-50 border-2 border-yellow-300 rounded-lg">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={includeExisting}
+                    onChange={(e) => {
+                      setIncludeExisting(e.target.checked)
+                      fetchData()
+                    }}
+                    disabled={stats.isRunning}
+                    className="mt-1 w-5 h-5 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                  />
+                  <div className="flex-1">
+                    <div className="font-bold text-yellow-900 text-base">
+                      🔄 Re-geocode ALL centers
                     </div>
-                    <div className="grid grid-cols-3 gap-2 text-sm">
-                      <div className="text-blue-700">
-                        <span className="font-medium">Processed:</span> {stats.processed}
-                      </div>
-                      <div className="text-green-700">
-                        <span className="font-medium">✅ Success:</span> {stats.successful}
-                      </div>
-                      <div className="text-red-700">
-                        <span className="font-medium">❌ Failed:</span> {stats.failed}
-                      </div>
+                    <p className="text-sm text-yellow-800 mt-1 font-medium">
+                      Check this to include centers that already have coordinates!
+                    </p>
+                    <p className="text-xs text-yellow-700 mt-1">
+                      This will update their addresses to Google's official addresses.
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              {/* Country Filter */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Filter by Country
+                </label>
+                <select
+                  value={selectedCountry}
+                  onChange={(e) => setSelectedCountry(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  disabled={stats.isRunning}
+                >
+                  <option value="">All Countries</option>
+                  {countries.map(country => (
+                    <option key={country.id} value={country.id}>
+                      {country.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Batch Size */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Batch Size (max per run)
+                </label>
+                <input
+                  type="number"
+                  value={batchSize}
+                  onChange={(e) => setBatchSize(parseInt(e.target.value) || 5)}
+                  min="1"
+                  max="100"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  disabled={stats.isRunning}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  {includeExisting 
+                    ? `Process up to ${batchSize} centers (including those with coordinates)` 
+                    : `Process up to ${batchSize} centers without coordinates`
+                  }
+                </p>
+              </div>
+
+              {/* Start Button */}
+              <button
+                onClick={startSmartGeocode}
+                disabled={stats.isRunning || !googleMapsLoaded || filteredCenters.length === 0}
+                className="w-full bg-green-500 text-white px-4 py-3 rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              >
+                {stats.isRunning ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Processing...
+                  </div>
+                ) : (
+                  `🔍 Start Smart Geocoding (${filteredCenters.length})`
+                )}
+              </button>
+
+              {/* Progress */}
+              {stats.isRunning && (
+                <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <h4 className="font-medium text-blue-900 mb-2">Progress</h4>
+                  <div className="w-full bg-blue-200 rounded-full h-2 mb-2">
+                    <div 
+                      className="bg-blue-500 h-2 rounded-full transition-all duration-300" 
+                      style={{ 
+                        width: `${stats.total > 0 ? (stats.processed / stats.total) * 100 : 0}%` 
+                      }}
+                    ></div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-sm">
+                    <div className="text-blue-700">
+                      <span className="font-medium">Done:</span> {stats.processed}
+                    </div>
+                    <div className="text-green-700">
+                      <span className="font-medium">✅:</span> {stats.successful}
+                    </div>
+                    <div className="text-red-700">
+                      <span className="font-medium">❌:</span> {stats.failed}
                     </div>
                   </div>
-                )}
-
-                {/* API Information */}
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <h4 className="font-medium text-green-800 mb-2">🔧 Fixed Issues</h4>
-                  <ul className="text-sm text-green-700 space-y-1">
-                    <li>• ✅ No more duplicate API loading</li>
-                    <li>• ✅ Centralized script management</li>
-                    <li>• ✅ Improved error handling</li>
-                    <li>• ✅ Better rate limiting (200ms delays)</li>
-                  </ul>
                 </div>
+              )}
+
+              {/* Info Box */}
+              <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <h4 className="font-medium text-green-800 mb-2">✨ How it works</h4>
+                <ul className="text-sm text-green-700 space-y-1">
+                  <li>• Searches Google Places by center name</li>
+                  <li>• Gets official address from Google Maps</li>
+                  <li>• Falls back to geocoding if needed</li>
+                  <li>• Updates both coordinates AND address</li>
+                </ul>
               </div>
             </div>
           </div>
 
-          {/* Centers List */}
+          {/* Results */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg shadow-sm border">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Centers Needing Geocoding ({filteredCenters.length})
-                </h3>
-              </div>
+            {results.length > 0 && (
+              <div className="bg-white rounded-lg shadow-sm border mb-6">
+                <div className="px-6 py-4 border-b border-gray-200">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Results ({results.length})
+                  </h3>
+                </div>
 
-              <div className="divide-y divide-gray-200">
-                {filteredCenters.length === 0 ? (
-                  <div className="p-8 text-center">
-                    <div className="text-green-500 text-4xl mb-4">🎉</div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">All Done!</h3>
-                    <p className="text-gray-600">All centers in this filter have coordinates.</p>
-                  </div>
-                ) : (
-                  filteredCenters.slice(0, batchSize).map((center) => {
-                    const country = countries.find(c => c.id === center.country_id)
-                    const result = results.find(r => r.centerId === center.id)
-                    
-                    return (
-                      <div key={center.id} className="p-4">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <h4 className="font-medium text-gray-900">{center.name}</h4>
-                              {result && (
-                                <span className={`text-xs px-2 py-1 rounded-full ${
-                                  result.success 
-                                    ? 'bg-green-100 text-green-800' 
-                                    : 'bg-red-100 text-red-800'
-                                }`}>
-                                  {result.success ? '✓ Geocoded' : '✗ Failed'}
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-sm text-gray-600 mb-1">{center.address}</p>
-                            <p className="text-xs text-gray-500">{country?.name}</p>
-                            {result && result.success && (
-                              <p className="text-xs text-green-600 mt-1">
-                                Lat: {result.lat?.toFixed(6)}, Lng: {result.lng?.toFixed(6)}
-                              </p>
-                            )}
-                            {result && !result.success && (
-                              <p className="text-xs text-red-600 mt-1">{result.error}</p>
-                            )}
+                <div className="divide-y divide-gray-200 max-h-[600px] overflow-y-auto">
+                  {results.map((result, index) => (
+                    <div 
+                      key={index}
+                      className={`px-6 py-4 ${result.success ? 'bg-green-50' : 'bg-red-50'}`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-lg">
+                              {result.success ? '✅' : '❌'}
+                            </span>
+                            <h4 className="font-medium text-gray-900">
+                              {result.centerName}
+                            </h4>
                           </div>
                           
-                          <Link
-                            href={`/admin/centers/${center.id}`}
-                            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                          >
-                            Edit →
-                          </Link>
+                          {result.success ? (
+                            <div className="text-sm space-y-1">
+                              <p className="text-green-700">
+                                <strong>Method:</strong> {result.method}
+                              </p>
+                              <p className="text-gray-600">
+                                <strong>Address:</strong> {result.address}
+                              </p>
+                              <p className="text-gray-600">
+                                <strong>Coordinates:</strong> {result.lat?.toFixed(6)}, {result.lng?.toFixed(6)}
+                              </p>
+                            </div>
+                          ) : (
+                            <p className="text-sm text-red-600">
+                              <strong>Error:</strong> {result.error}
+                            </p>
+                          )}
                         </div>
                       </div>
-                    )
-                  })
-                )}
-              </div>
-
-              {filteredCenters.length > batchSize && (
-                <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
-                  <p className="text-sm text-gray-600">
-                    Showing first {batchSize} centers. Adjust batch size to process more at once.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Results Summary */}
-            {results.length > 0 && (
-              <div className="mt-6 bg-white rounded-lg shadow-sm border p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                  Latest Results ({results.length})
-                </h3>
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="bg-green-50 p-4 rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">{stats.successful}</div>
-                    <div className="text-green-700">Successfully Geocoded</div>
-                  </div>
-                  <div className="bg-red-50 p-4 rounded-lg">
-                    <div className="text-2xl font-bold text-red-600">{stats.failed}</div>
-                    <div className="text-red-700">Failed to Geocode</div>
-                  </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
+
+            {/* Centers List */}
+            <div className="bg-white rounded-lg shadow-sm border">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  {includeExisting 
+                    ? `All Centers (${filteredCenters.length})`
+                    : `Centers Needing Geocoding (${filteredCenters.length})`
+                  }
+                </h3>
+                {includeExisting && (
+                  <p className="text-sm text-yellow-600 mt-1">
+                    ⚠️ All centers will be re-geocoded with Google's official addresses
+                  </p>
+                )}
+              </div>
+
+              <div className="divide-y divide-gray-200 max-h-[600px] overflow-y-auto">
+                {filteredCenters.length === 0 ? (
+                  <div className="px-6 py-12 text-center text-gray-500">
+                    <p className="text-lg mb-2">🎉 All done!</p>
+                    <p>
+                      {includeExisting 
+                        ? 'No centers found in this country.'
+                        : 'All centers in this country have coordinates.'
+                      }
+                    </p>
+                  </div>
+                ) : (
+                  filteredCenters.slice(0, 20).map(center => (
+                    <div key={center.id} className="px-6 py-4 hover:bg-gray-50">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h4 className="font-medium text-gray-900 mb-1">
+                            {center.name}
+                          </h4>
+                          <p className="text-sm text-gray-600 mb-1">
+                            {center.address}
+                          </p>
+                          {center.latitude && center.longitude && (
+                            <p className="text-xs text-blue-600">
+                              📍 Has coordinates: {center.latitude.toFixed(6)}, {center.longitude.toFixed(6)}
+                            </p>
+                          )}
+                          <p className="text-xs text-gray-500 mt-1">
+                            Country: {countries.find(c => c.id === center.country_id)?.name}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+                
+                {filteredCenters.length > 20 && (
+                  <div className="px-6 py-4 bg-gray-50 text-center text-sm text-gray-600">
+                    ... and {filteredCenters.length - 20} more centers
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>

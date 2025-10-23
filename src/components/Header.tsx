@@ -28,7 +28,9 @@ export default function Header() {
     { name: 'Centers', href: '/admin/centers' },
     { name: 'Import', href: '/admin/import' },
     { name: 'Geocoding', href: '/admin/geocoding' },
-    { name: 'Settings', href: '/admin/settings' }
+    { name: 'Settings', href: '/admin/settings' },
+    { name: 'Cleanup Duplicates', href: '/admin/cleanup-duplicates' }
+    
   ]
 
   // Prevent hydration mismatch by not rendering dynamic content until mounted

@@ -1,4 +1,4 @@
-// src/app/page.tsx - Enhanced Homepage with Better Error Handling
+// src/app/page.tsx - Enhanced Homepage with Location-Based Sorting
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
@@ -141,6 +141,19 @@ const fetchData = async () => {
   }
 }
 
+  // Helper function to calculate distance between two coordinates (Haversine formula)
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371 // Radius of the Earth in kilometers
+    const dLat = (lat2 - lat1) * Math.PI / 180
+    const dLon = (lon2 - lon1) * Math.PI / 180
+    const a = 
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2)
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    return R * c // Distance in kilometers
+  }
+
   // Filter centers based on search criteria
   const filteredCentres = useMemo(() => {
     console.log('🔍 Starting filter with:', filters.search || 'no search term')
@@ -200,8 +213,31 @@ const fetchData = async () => {
     console.log(`✅ After deduplication: ${uniqueCentres.length} centers`)
     console.log(`🗑️ Removed ${filtered.length - uniqueCentres.length} duplicates by name`)
 
+    // NEW: Sort by distance if user location is available
+    if (userLocation) {
+      const centresWithDistance = uniqueCentres
+        .filter(centre => centre.latitude && centre.longitude)
+        .map(centre => ({
+          ...centre,
+          distance: calculateDistance(
+            userLocation.lat,
+            userLocation.lng,
+            centre.latitude!,
+            centre.longitude!
+          )
+        }))
+        .sort((a, b) => a.distance - b.distance)
+
+      // Add centers without coordinates at the end
+      const centresWithoutCoords = uniqueCentres.filter(centre => !centre.latitude || !centre.longitude)
+      
+      console.log(`📍 Sorted by distance from user location: ${centresWithDistance.length} centers with coords, ${centresWithoutCoords.length} without`)
+      
+      return [...centresWithDistance, ...centresWithoutCoords]
+    }
+
     return uniqueCentres
-  }, [centres, filters])
+  }, [centres, filters, userLocation])
 
   // Get featured centers (first 6 filtered results)
   const featuredCentres = useMemo(() => {
@@ -267,6 +303,15 @@ const fetchData = async () => {
   const getCenterTypeName = (typeId: string) => {
     const type = centerTypes.find(t => t.id === typeId)
     return type?.name || 'Unknown'
+  }
+
+  // Helper to format distance
+  const formatDistance = (center: Centre & { distance?: number }) => {
+    if (!center.distance) return null
+    if (center.distance < 1) {
+      return `${Math.round(center.distance * 1000)}m away`
+    }
+    return `${center.distance.toFixed(1)}km away`
   }
 
   if (loading) {
@@ -403,6 +448,16 @@ const fetchData = async () => {
                 </button>
               )}
             </div>
+
+            {/* Location Status */}
+            {userLocation && (
+              <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-3">
+                <p className="text-green-800 text-sm flex items-center gap-2">
+                  <span>✓</span>
+                  <span><strong>Location detected!</strong> Centers are now sorted by distance from you.</span>
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -416,7 +471,12 @@ const fetchData = async () => {
               <div className="flex justify-between items-center">
                 <div>
                   <h2 className="text-2xl font-bold text-gray-900">Explore Centers on Map</h2>
-                  <p className="text-gray-600 mt-1">Interactive map showing all matching rehabilitation centers</p>
+                  <p className="text-gray-600 mt-1">
+                    {userLocation 
+                      ? 'Interactive map showing centers sorted by distance from you'
+                      : 'Interactive map showing all matching rehabilitation centers'
+                    }
+                  </p>
                 </div>
                 <div className="text-right">
                   <div className="text-2xl font-bold text-blue-600">
@@ -453,7 +513,7 @@ const fetchData = async () => {
           <div className="p-6 border-b border-gray-200">
             <div className="flex justify-between items-center">
               <h2 className="text-xl font-semibold text-gray-900">
-                Featured Rehabilitation Centers
+                {userLocation ? 'Nearest Rehabilitation Centers' : 'Featured Rehabilitation Centers'}
               </h2>
               <a 
                 href="/centres"
@@ -463,7 +523,9 @@ const fetchData = async () => {
               </a>
             </div>
             <p className="text-gray-600 text-sm mt-2">
-              {filters.search ? `Showing first 6 of ${filteredCentres.length} matching centers` : 'Discover some of our featured rehabilitation centers'}
+              {userLocation && `Showing the 6 closest centers to your location`}
+              {!userLocation && filters.search && `Showing first 6 of ${filteredCentres.length} matching centers`}
+              {!userLocation && !filters.search && 'Discover some of our featured rehabilitation centers'}
             </p>
           </div>
           
@@ -494,6 +556,11 @@ const fetchData = async () => {
                         {centre.verified && (
                           <span className="text-green-600 text-sm bg-green-100 px-2 py-1 rounded-full">
                             ✓ Verified
+                          </span>
+                        )}
+                        {userLocation && 'distance' in centre && centre.distance !== undefined && (
+                          <span className="text-blue-600 text-sm bg-blue-100 px-2 py-1 rounded-full">
+                            {formatDistance(centre as Centre & { distance?: number })}
                           </span>
                         )}
                       </div>

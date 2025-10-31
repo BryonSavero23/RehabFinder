@@ -1,4 +1,4 @@
-// src/app/page.tsx - Enhanced Homepage with Duplicate Detection
+// src/app/page.tsx - Enhanced Homepage with Better Error Handling
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
@@ -48,7 +48,10 @@ const fetchData = async () => {
           .range(from, from + pageSize - 1)
           .order('name')
         
-        if (error) throw error
+        if (error) {
+          console.error('Supabase error:', error)
+          throw error
+        }
         if (!data || data.length === 0) break
         
         allCenters = [...allCenters, ...data]
@@ -102,8 +105,14 @@ const fetchData = async () => {
       supabase.from('center_types').select('*').order('name')
     ])
 
-    if (countriesResult.error) throw countriesResult.error
-    if (typesResult.error) throw typesResult.error
+    if (countriesResult.error) {
+      console.error('Countries error:', countriesResult.error)
+      throw countriesResult.error
+    }
+    if (typesResult.error) {
+      console.error('Center types error:', typesResult.error)
+      throw typesResult.error
+    }
 
     console.log('✅ Total loaded:', centres.length)
 
@@ -112,8 +121,21 @@ const fetchData = async () => {
     setCenterTypes(typesResult.data || [])
 
   } catch (err) {
+    // FIXED: Better error handling for network and database errors
     console.error('Error fetching data:', err)
-    setError(err instanceof Error ? err.message : 'Failed to load data')
+    
+    let errorMessage = 'Failed to load data'
+    
+    // Handle different error types
+    if (err instanceof TypeError && err.message.includes('fetch')) {
+      errorMessage = 'Network Error: Cannot connect to database. Please check your internet connection and Supabase configuration.'
+    } else if (err && typeof err === 'object' && 'message' in err) {
+      errorMessage = (err as any).message || 'Database error occurred'
+    } else if (err instanceof Error) {
+      errorMessage = err.message
+    }
+    
+    setError(errorMessage)
   } finally {
     setLoading(false)
   }
@@ -261,12 +283,22 @@ const fetchData = async () => {
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center p-8 max-w-md">
+        <div className="text-center p-8 max-w-2xl">
           <div className="text-red-500 text-xl mb-4">⚠️ Error Loading Data</div>
-          <p className="text-gray-600 mb-4">{error}</p>
+          <p className="text-gray-900 font-semibold mb-2">{error}</p>
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4 text-left">
+            <p className="text-sm text-gray-700 mb-2"><strong>Common fixes:</strong></p>
+            <ul className="text-sm text-gray-600 list-disc list-inside space-y-1">
+              <li>Check your internet connection</li>
+              <li>Verify NEXT_PUBLIC_SUPABASE_URL in .env.local</li>
+              <li>Verify NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local</li>
+              <li>Restart your development server after changing .env.local</li>
+              <li>Check Supabase project status at supabase.com</li>
+            </ul>
+          </div>
           <button 
             onClick={fetchData}
-            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+            className="bg-blue-500 text-white px-6 py-3 rounded hover:bg-blue-600 font-semibold"
           >
             Try Again
           </button>

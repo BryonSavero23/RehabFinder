@@ -19,7 +19,7 @@ export default function Header() {
   const navItems = [
     { name: 'Home', href: '/' },
     { name: 'Find Centres', href: '/centres' },
-    { name: 'Resources', href: '/resources' },
+    { name: 'Resources', href: '/#resources' },  // ✅ CHANGED: Now scrolls to resources section
     { name: 'Contact', href: '/contact' }
   ]
 

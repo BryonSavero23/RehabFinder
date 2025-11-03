@@ -4,6 +4,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import CenterMap from '@/components/CenterMap'
+import ExerciseVideos from '@/components/ExerciseVideos'
 import type { Centre, Country, CenterType, FilterState } from '@/types/center'
 
 export default function HomePage() {
@@ -645,7 +646,7 @@ const fetchData = async () => {
       </div>
 
         {/* Comprehensive Rehabilitation Resources */}
-        <div className="mb-12 max-w-7xl mx-auto px-4">
+        <div id="resources" className="mb-12 max-w-7xl mx-auto px-4">
           <div className="text-center mb-8">
             <h2 className="text-3xl font-bold text-gray-900 mb-4">
               Comprehensive Rehabilitation Resources
@@ -655,19 +656,13 @@ const fetchData = async () => {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {/* Exercise Videos */}
-            <div className="bg-white rounded-lg shadow-sm p-6 text-center">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl">▶️</span>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Exercise Videos</h3>
-              <p className="text-gray-600 text-sm mb-4">Guided rehabilitation exercises and therapy routines</p>
-              <button className="bg-blue-500 text-white px-4 py-2 rounded text-sm hover:bg-blue-600">
-                Coming Soon
-              </button>
-            </div>
+          {/* Exercise Videos Section - NOW WITH YOUTUBE VIDEOS! */}
+          <div className="mb-12">
+            <ExerciseVideos />
+          </div>
 
+          {/* Other Resources */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* Downloadable Toolkits */}
             <div className="bg-white rounded-lg shadow-sm p-6 text-center">
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -710,7 +705,7 @@ const fetchData = async () => {
       <footer className="bg-gray-800 text-white py-8">
         <div className="max-w-7xl mx-auto px-4 text-center">
           <p className="text-gray-300">© 2024 RehabFinder. Connecting you to recovery resources in Malaysia & Thailand.</p>
-          <p className="text-gray-400 text-sm mt-2">Phase 1: Rehabilitation Centers Database • Phase 2: Exercise Videos Coming Soon</p>
+          <p className="text-gray-400 text-sm mt-2">Phase 1: Rehabilitation Centers Database • Phase 2: Exercise Videos Now Live!</p>
         </div>
       </footer>
     </div>

@@ -5,16 +5,17 @@ import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import CenterMap from '@/components/CenterMap'
 import ExerciseVideos from '@/components/ExerciseVideos'
-import type { Centre, Country, CenterType, FilterState } from '@/types/center'
+import type { Centre, Country, State, CenterType, FilterState } from '@/types/center'
 
 export default function HomePage() {
   const [centres, setCentres] = useState<Centre[]>([])
   const [countries, setCountries] = useState<Country[]>([])
+  const [states, setStates] = useState<State[]>([])
   const [centerTypes, setCenterTypes] = useState<CenterType[]>([])
   const [filters, setFilters] = useState<FilterState>({
     country: '',
+    state: '',
     type: '',
-    accessibility: false,
     search: ''
   })
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
@@ -22,6 +23,12 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null)
   const [loadingLocation, setLoadingLocation] = useState(false)
   const [selectedCenter, setSelectedCenter] = useState<Centre | null>(null)
+
+  // Filter states based on selected country
+  const availableStates = useMemo(() => {
+    if (!filters.country) return []
+    return states.filter(state => state.country_id === filters.country)
+  }, [states, filters.country])
 
   // Fetch data from database
   useEffect(() => {
@@ -100,15 +107,20 @@ const fetchData = async () => {
       return allCenters
     }
 
-    const [centres, countriesResult, typesResult] = await Promise.all([
+    const [centres, countriesResult, statesResult, typesResult] = await Promise.all([
       fetchAllCenters(),
       supabase.from('countries').select('*').order('name'),
+      supabase.from('states').select('*').order('name'),
       supabase.from('center_types').select('*').order('name')
     ])
 
     if (countriesResult.error) {
       console.error('Countries error:', countriesResult.error)
       throw countriesResult.error
+    }
+    if (statesResult.error) {
+      console.error('States error:', statesResult.error)
+      throw statesResult.error
     }
     if (typesResult.error) {
       console.error('Center types error:', typesResult.error)
@@ -119,6 +131,7 @@ const fetchData = async () => {
 
     setCentres(centres)
     setCountries(countriesResult.data || [])
+    setStates(statesResult.data || [])
     setCenterTypes(typesResult.data || [])
 
   } catch (err) {
@@ -175,14 +188,14 @@ const fetchData = async () => {
       console.log(`🌍 After country filter: ${filtered.length} centers`)
     }
 
+    if (filters.state) {
+      filtered = filtered.filter(centre => centre.state_id === filters.state)
+      console.log(`📍 After state filter: ${filtered.length} centers`)
+    }
+
     if (filters.type) {
       filtered = filtered.filter(centre => centre.center_type_id === filters.type)
       console.log(`🏥 After type filter: ${filtered.length} centers`)
-    }
-
-    if (filters.accessibility) {
-      filtered = filtered.filter(centre => centre.accessibility)
-      console.log(`♿ After accessibility filter: ${filtered.length} centers`)
     }
 
     console.log(`📊 Before deduplication: ${filtered.length} centers`)
@@ -301,6 +314,12 @@ const fetchData = async () => {
     return country?.name || 'Unknown'
   }
 
+  const getStateName = (stateId: string | null | undefined) => {
+    if (!stateId) return null
+    const state = states.find(s => s.id === stateId)
+    return state?.name || null
+  }
+
   const getCenterTypeName = (typeId: string) => {
     const type = centerTypes.find(t => t.id === typeId)
     return type?.name || 'Unknown'
@@ -406,7 +425,7 @@ const fetchData = async () => {
             <div className="mt-4 flex flex-wrap gap-3">
               <select
                 value={filters.country}
-                onChange={(e) => setFilters({ ...filters, country: e.target.value })}
+                onChange={(e) => setFilters({ ...filters, country: e.target.value, state: '' })}
                 className="px-4 py-2 bg-white text-gray-900 rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none"
               >
                 <option value="">All Countries</option>
@@ -416,6 +435,21 @@ const fetchData = async () => {
                   </option>
                 ))}
               </select>
+
+              {availableStates.length > 0 && (
+                <select
+                  value={filters.state}
+                  onChange={(e) => setFilters({ ...filters, state: e.target.value })}
+                  className="px-4 py-2 bg-white text-gray-900 rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="">All States</option>
+                  {availableStates.map((state) => (
+                    <option key={state.id} value={state.id}>
+                      {state.name}
+                    </option>
+                  ))}
+                </select>
+              )}
 
               <select
                 value={filters.type}
@@ -430,19 +464,9 @@ const fetchData = async () => {
                 ))}
               </select>
 
-              <label className="flex items-center gap-2 px-4 py-2 bg-white text-gray-900 rounded-md border border-gray-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={filters.accessibility}
-                  onChange={(e) => setFilters({ ...filters, accessibility: e.target.checked })}
-                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                />
-                <span>Wheelchair Accessible</span>
-              </label>
-
-              {(filters.search || filters.country || filters.type || filters.accessibility) && (
+              {(filters.search || filters.country || filters.state || filters.type) && (
                 <button
-                  onClick={() => setFilters({ country: '', type: '', accessibility: false, search: '' })}
+                  onClick={() => setFilters({ country: '', state: '', type: '', search: '' })}
                   className="px-4 py-2 bg-red-100 text-red-700 rounded-md hover:bg-red-200"
                 >
                   Clear Filters
@@ -539,7 +563,7 @@ const fetchData = async () => {
                   Try adjusting your search criteria or clearing your filters.
                 </p>
                 <button 
-                  onClick={() => setFilters({ country: '', type: '', accessibility: false, search: '' })}
+                  onClick={() => setFilters({ country: '', state: '', type: '', search: '' })}
                   className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
                 >
                   Clear Filters
@@ -579,7 +603,10 @@ const fetchData = async () => {
                         
                         <div className="flex items-center gap-2">
                           <span>🌍</span>
-                          <span>{getCountryName(centre.country_id)}</span>
+                          <span>
+                            {getCountryName(centre.country_id)}
+                            {getStateName(centre.state_id) && ` • ${getStateName(centre.state_id)}`}
+                          </span>
                         </div>
                         
                         {centre.accessibility && (

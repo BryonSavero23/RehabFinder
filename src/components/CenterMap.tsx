@@ -550,15 +550,19 @@ export default function CenterMap({
   }
 
   const getMarkerColor = (type: string): string => {
-    const colors: { [key: string]: string } = {
-      'Inpatient': '#dc2626',
-      'Outpatient': '#059669',
-      'Community': '#7c3aed',
-      'Traditional': '#d97706',
-      'Specialist': '#2563eb',
-    }
-    return colors[type] || '#6b7280'
+  const colors: { [key: string]: string } = {
+    'Government Hospital': '#dc2626',      // Red
+    'Private Hospital': '#059669',         // Green  
+    'NGO': '#7c3aed',                      // Purple
+    // Fallback for any old types that might still exist
+    'Inpatient': '#dc2626',
+    'Outpatient': '#059669',
+    'Community': '#7c3aed',
+    'Traditional': '#d97706',
+    'Specialist': '#2563eb',
   }
+  return colors[type] || '#6b7280'  // Gray as default
+}
 
   const createInfoWindowContent = (center: Centre, centerType: string, position: { lat: number; lng: number }): string => {
     const countryName = getCountryName(center.country_id)

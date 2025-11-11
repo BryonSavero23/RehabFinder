@@ -4,16 +4,17 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import CenterMap from '@/components/CenterMap'
-import type { Centre, Country, CenterType, FilterState } from '@/types/center'
+import type { Centre, Country, State, CenterType, FilterState } from '@/types/center'
 
 export default function FindCentresPage() {
   const [centres, setCentres] = useState<Centre[]>([])
   const [countries, setCountries] = useState<Country[]>([])
+  const [states, setStates] = useState<State[]>([])
   const [centerTypes, setCenterTypes] = useState<CenterType[]>([])
   const [filters, setFilters] = useState<FilterState>({
     country: '',
+    state: '',
     type: '',
-    accessibility: false,
     search: ''
   })
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
@@ -22,6 +23,12 @@ export default function FindCentresPage() {
   const [loadingLocation, setLoadingLocation] = useState(false)
   const [selectedCenter, setSelectedCenter] = useState<Centre | null>(null)
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list')
+
+  // Filter states based on selected country
+  const availableStates = useMemo(() => {
+    if (!filters.country) return []
+    return states.filter(state => state.country_id === filters.country)
+  }, [states, filters.country])
 
   useEffect(() => {
     fetchData()
@@ -57,17 +64,20 @@ export default function FindCentresPage() {
         return allCenters
       }
 
-      const [centres, countriesResult, typesResult] = await Promise.all([
+      const [centres, countriesResult, statesResult, typesResult] = await Promise.all([
         fetchAllCenters(),
         supabase.from('countries').select('*').order('name'),
+        supabase.from('states').select('*').order('name'),
         supabase.from('center_types').select('*').order('name')
       ])
 
       if (countriesResult.error) throw countriesResult.error
+      if (statesResult.error) throw statesResult.error
       if (typesResult.error) throw typesResult.error
 
       setCentres(centres)
       setCountries(countriesResult.data || [])
+      setStates(statesResult.data || [])
       setCenterTypes(typesResult.data || [])
 
     } catch (err) {
@@ -95,12 +105,12 @@ export default function FindCentresPage() {
       filtered = filtered.filter(centre => centre.country_id === filters.country)
     }
 
-    if (filters.type) {
-      filtered = filtered.filter(centre => centre.center_type_id === filters.type)
+    if (filters.state) {
+      filtered = filtered.filter(centre => centre.state_id === filters.state)
     }
 
-    if (filters.accessibility) {
-      filtered = filtered.filter(centre => centre.accessibility)
+    if (filters.type) {
+      filtered = filtered.filter(centre => centre.center_type_id === filters.type)
     }
 
     return filtered
@@ -139,14 +149,19 @@ export default function FindCentresPage() {
   const clearFilters = () => {
     setFilters({
       country: '',
+      state: '',
       type: '',
-      accessibility: false,
       search: ''
     })
   }
 
   const getCountryName = (countryId: string) => {
     return countries.find(c => c.id === countryId)?.name || 'Unknown'
+  }
+
+  const getStateName = (stateId: string | null | undefined) => {
+    if (!stateId) return null
+    return states.find(s => s.id === stateId)?.name || null
   }
 
   const getCenterTypeName = (typeId: string) => {
@@ -222,7 +237,7 @@ export default function FindCentresPage() {
               </label>
               <select
                 value={filters.country}
-                onChange={(e) => setFilters({ ...filters, country: e.target.value })}
+                onChange={(e) => setFilters({ ...filters, country: e.target.value, state: '' })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               >
                 <option value="">All Countries</option>
@@ -234,6 +249,30 @@ export default function FindCentresPage() {
               </select>
             </div>
 
+            {/* State Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                State
+              </label>
+              <select
+                value={filters.state}
+                onChange={(e) => setFilters({ ...filters, state: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                disabled={availableStates.length === 0}
+              >
+                <option value="">
+                  {availableStates.length === 0 ? 'Select country first' : 'All States'}
+                </option>
+                {availableStates.map((state) => (
+                  <option key={state.id} value={state.id}>
+                    {state.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             {/* Type Filter */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -256,16 +295,6 @@ export default function FindCentresPage() {
 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <label className="flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={filters.accessibility}
-                  onChange={(e) => setFilters({ ...filters, accessibility: e.target.checked })}
-                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                />
-                <span className="ml-2 text-sm text-gray-700">♿ Wheelchair Accessible Only</span>
-              </label>
-
               <button
                 onClick={handleUseLocation}
                 disabled={loadingLocation}
@@ -357,6 +386,9 @@ export default function FindCentresPage() {
                           <div className="flex items-center gap-4">
                             <span>🏥 {getCenterTypeName(centre.center_type_id)}</span>
                             <span>🌍 {getCountryName(centre.country_id)}</span>
+                            {getStateName(centre.state_id) && (
+                              <span>📍 {getStateName(centre.state_id)}</span>
+                            )}
                             {centre.accessibility && <span>♿ Wheelchair Accessible</span>}
                           </div>
                           

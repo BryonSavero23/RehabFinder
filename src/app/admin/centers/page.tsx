@@ -1,4 +1,4 @@
-// src/app/admin/centers/page.tsx - Complete Admin Centers Management Page with Pagination Fix
+// src/app/admin/centers/page.tsx - Admin Centers Management Page (Cleaned)
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
@@ -133,12 +133,6 @@ export default function AdminCentersPage() {
       }
 
       console.log(`✅ ADMIN TOTAL: Loaded ${centers.length} centers`)
-      
-      // Log Tung Shin specifically
-      const tungShin = centers.filter(c => 
-        c.name.toLowerCase().includes('tung shin')
-      )
-      console.log(`Found ${tungShin.length} Tung Shin centers:`, tungShin)
 
       setCenters(centers)
       setCountries(countriesResult.data || [])
@@ -187,7 +181,11 @@ export default function AdminCentersPage() {
     return filtered
   }, [centers, filters])
 
-  // Pagination
+  // Pagination - Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [filters])
+
   const totalPages = Math.ceil(filteredCenters.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
@@ -221,6 +219,9 @@ export default function AdminCentersPage() {
 
   const handleBulkAction = async (action: 'verify' | 'unverify' | 'activate' | 'deactivate') => {
     if (selectedCenters.size === 0) return
+
+    const confirmMessage = `Are you sure you want to ${action} ${selectedCenters.size} center(s)?`
+    if (!confirm(confirmMessage)) return
 
     setBulkActionLoading(true)
     try {
@@ -270,7 +271,6 @@ export default function AdminCentersPage() {
       active: '',
       needsGeocode: false
     })
-    setCurrentPage(1)
   }
 
   if (loading) {
@@ -315,163 +315,6 @@ export default function AdminCentersPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Comprehensive Debug Section */}
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-6">
-          <h3 className="font-semibold text-red-800 mb-4">🔍 Comprehensive Database Debug</h3>
-          
-          <div className="grid md:grid-cols-2 gap-4 mb-4">
-            <div className="bg-white p-4 rounded border">
-              <h4 className="font-semibold text-gray-900 mb-3">Database Stats</h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Total Centers:</span>
-                  <span className="font-bold text-gray-900">{centers.length}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Active Centers:</span>
-                  <span className="font-bold text-green-600">
-                    {centers.filter(c => c.active).length}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Inactive Centers:</span>
-                  <span className="font-bold text-red-600">
-                    {centers.filter(c => !c.active).length}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">With Coordinates:</span>
-                  <span className="font-bold text-blue-600">
-                    {centers.filter(c => c.latitude && c.longitude).length}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Without Coordinates:</span>
-                  <span className="font-bold text-orange-600">
-                    {centers.filter(c => !c.latitude || !c.longitude).length}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white p-4 rounded border">
-              <h4 className="font-semibold text-gray-900 mb-3">Search Test</h4>
-              <input
-                type="text"
-                placeholder="Search term..."
-                className="w-full px-3 py-2 border rounded mb-2"
-                id="debugSearch"
-              />
-              <button
-                onClick={() => {
-                  const input = document.getElementById('debugSearch') as HTMLInputElement
-                  const searchTerm = input.value
-                  const matches = centers.filter(c => 
-                    c.name.toLowerCase().includes(searchTerm.toLowerCase())
-                  )
-                  console.log(`Search for "${searchTerm}":`, matches)
-                  alert(`Found ${matches.length} matches for "${searchTerm}"`)
-                }}
-                className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 w-full"
-              >
-                Test Search
-              </button>
-            </div>
-          </div>
-          
-          <div className="grid md:grid-cols-3 gap-4 mb-4">
-            <button
-              onClick={async () => {
-                console.log('=== RAW DATABASE QUERY ===')
-                const { data, error } = await supabase
-                  .from('rehabilitation_centers')
-                  .select('*')
-                  .order('name')
-                
-                console.log('Query result:', { data: data?.length, error })
-                alert(`Raw DB Query: ${data?.length || 0} total centers`)
-              }}
-              className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-            >
-              🔍 Raw DB Query
-            </button>
-            
-            <button
-              onClick={async () => {
-                console.log('=== HOMEPAGE QUERY SIMULATION ===')
-                const { data, error } = await supabase
-                  .from('rehabilitation_centers')
-                  .select('*')
-                  .eq('active', true)
-                  .order('name')
-                
-                console.log('Homepage query result:', { data: data?.length, error })
-                alert(`Homepage Query: ${data?.length || 0} active centers`)
-              }}
-              className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
-            >
-              🏠 Homepage Query Test
-            </button>
-            
-            <button
-              onClick={async () => {
-                console.log('=== SPECIFIC TUNG SHIN LOOKUP ===')
-                const { data, error } = await supabase
-                  .from('rehabilitation_centers')
-                  .select('*')
-                  .ilike('name', '%tung shin%')
-                
-                console.log('Specific Tung Shin lookup:', { data, error })
-                
-                if (data && data.length > 0) {
-                  const center = data[0]
-                  alert(`Found Tung Shin!\nID: ${center.id}\nActive: ${center.active}\nCoords: ${center.latitude}, ${center.longitude}`)
-                } else {
-                  alert('Tung Shin not found with specific lookup')
-                }
-              }}
-              className="bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700"
-            >
-              🔎 Find Tung Shin
-            </button>
-          </div>
-
-          <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
-            <p className="text-sm text-yellow-800">
-              <strong>Expected Result Based on Database:</strong>
-            </p>
-            <ul className="text-sm text-yellow-700 mt-2 space-y-1">
-              <li>✅ Tung Shin Hospital should be found</li>
-              <li>✅ It should be active (true)</li>
-              <li>✅ It should have coordinates (3.14543700, 101.70364100)</li>
-              <li>✅ It should appear in homepage search</li>
-            </ul>
-            <p className="text-sm text-yellow-800 mt-2">
-              <strong>If any button above shows different results, there's a data sync issue!</strong>
-            </p>
-          </div>
-
-          <div className="mt-4 bg-white p-3 rounded border">
-            <button
-              onClick={() => {
-                const centerId = prompt('Enter center ID to check:')
-                if (!centerId) return
-                
-                const center = centers.find(c => c.id === centerId)
-                if (center) {
-                  console.log('Center found:', center)
-                  alert(`Center: ${center.name}\nActive: ${center.active}\nVerified: ${center.verified}\nCoords: ${center.latitude}, ${center.longitude}`)
-                } else {
-                  alert('Center not found in loaded data')
-                }
-              }}
-              className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 text-sm"
-            >
-              🆔 Check Specific ID
-            </button>
-          </div>
-        </div>
-
         {/* Filters */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h3 className="font-semibold text-gray-900 mb-4">Filters</h3>

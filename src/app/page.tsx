@@ -1,7 +1,7 @@
-// src/app/page.tsx - Enhanced Homepage with Location-Based Sorting
+// src/app/page.tsx - Enhanced Homepage with Location-Based Sorting + Autocomplete Search
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import CenterMap from '@/components/CenterMap'
 import ExerciseVideos from '@/components/ExerciseVideos'
@@ -23,6 +23,16 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null)
   const [loadingLocation, setLoadingLocation] = useState(false)
   const [selectedCenter, setSelectedCenter] = useState<Centre | null>(null)
+
+  // NEW: Autocomplete state
+  const [searchSuggestions, setSearchSuggestions] = useState<Array<{
+    type: 'center' | 'location' | 'service'
+    value: string
+    center?: Centre
+  }>>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1)
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   // Filter states based on selected country
   const availableStates = useMemo(() => {
@@ -154,6 +164,137 @@ const fetchData = async () => {
     setLoading(false)
   }
 }
+
+  // NEW: Generate autocomplete suggestions
+  useEffect(() => {
+    if (!filters.search || filters.search.length < 2) {
+      setSearchSuggestions([])
+      setShowSuggestions(false)
+      return
+    }
+
+    const searchTerm = filters.search.toLowerCase()
+    const suggestions: Array<{
+      type: 'center' | 'location' | 'service'
+      value: string
+      center?: Centre
+    }> = []
+
+    // Get center name suggestions
+    const centerMatches = centres
+      .filter(centre => 
+        centre.name.toLowerCase().includes(searchTerm) && centre.active
+      )
+      .slice(0, 5)
+      .map(centre => ({
+        type: 'center' as const,
+        value: centre.name,
+        center: centre
+      }))
+
+    // Get location suggestions from addresses
+    const locationSet = new Set<string>()
+    centres
+      .filter(centre => centre.active)
+      .forEach(centre => {
+        if (centre.address) {
+          const parts = centre.address.split(',').map(p => p.trim())
+          parts.forEach(part => {
+            if (part.toLowerCase().includes(searchTerm) && part.length > 2) {
+              locationSet.add(part)
+            }
+          })
+        }
+      })
+    
+    const locationMatches = Array.from(locationSet)
+      .slice(0, 5)
+      .map(location => ({
+        type: 'location' as const,
+        value: location,
+      }))
+
+    // Get service suggestions
+    const serviceSet = new Set<string>()
+    centres
+      .filter(centre => centre.active && centre.services)
+      .forEach(centre => {
+        if (centre.services) {
+          const services = centre.services.split(',').map(s => s.trim())
+          services.forEach(service => {
+            if (service.toLowerCase().includes(searchTerm) && service.length > 2) {
+              serviceSet.add(service)
+            }
+          })
+        }
+      })
+
+    const serviceMatches = Array.from(serviceSet)
+      .slice(0, 5)
+      .map(service => ({
+        type: 'service' as const,
+        value: service,
+      }))
+
+    // Combine all suggestions with priority: centers first, then locations, then services
+    suggestions.push(...centerMatches, ...locationMatches, ...serviceMatches)
+
+    setSearchSuggestions(suggestions.slice(0, 10)) // Limit to 10 total suggestions
+    setShowSuggestions(suggestions.length > 0)
+    setSelectedSuggestionIndex(-1)
+  }, [filters.search, centres])
+
+  // NEW: Handle suggestion click
+  const handleSuggestionClick = (suggestion: typeof searchSuggestions[0]) => {
+    setFilters({ ...filters, search: suggestion.value })
+    setShowSuggestions(false)
+    setSelectedSuggestionIndex(-1)
+    
+    // If it's a center suggestion, scroll to it
+    if (suggestion.center) {
+      setSelectedCenter(suggestion.center)
+    }
+  }
+
+  // NEW: Handle keyboard navigation
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showSuggestions) return
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        setSelectedSuggestionIndex(prev => 
+          prev < searchSuggestions.length - 1 ? prev + 1 : prev
+        )
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        setSelectedSuggestionIndex(prev => prev > 0 ? prev - 1 : -1)
+        break
+      case 'Enter':
+        e.preventDefault()
+        if (selectedSuggestionIndex >= 0 && selectedSuggestionIndex < searchSuggestions.length) {
+          handleSuggestionClick(searchSuggestions[selectedSuggestionIndex])
+        }
+        break
+      case 'Escape':
+        setShowSuggestions(false)
+        setSelectedSuggestionIndex(-1)
+        break
+    }
+  }
+
+  // NEW: Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchInputRef.current && !searchInputRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   // Helper function to calculate distance between two coordinates (Haversine formula)
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -389,18 +530,68 @@ const fetchData = async () => {
             </p>
           </div>
 
-          {/* Search Box */}
+          {/* Search Box with Autocomplete */}
           <div className="mt-12 max-w-4xl mx-auto">
             <div className="bg-white rounded-lg shadow-lg p-2">
               <div className="flex flex-col sm:flex-row gap-2">
-                <div className="flex-1">
+                <div className="flex-1 relative">
                   <input
+                    ref={searchInputRef}
                     type="text"
                     placeholder="Search by location, name, or services... (e.g., Cheras, KL, addiction)"
                     value={filters.search}
                     onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-                    className="w-full px-4 py-3 text-gray-900 outline-none rounded-md"
+                    onKeyDown={handleKeyDown}
+                    onFocus={() => {
+                      if (searchSuggestions.length > 0) {
+                        setShowSuggestions(true)
+                      }
+                    }}
+                    className="w-full px-4 py-3 text-gray-900 outline-none rounded-md border-2 border-transparent focus:border-blue-500"
                   />
+                  
+                  {/* Suggestions Dropdown */}
+                  {showSuggestions && searchSuggestions.length > 0 && (
+                    <div className="absolute z-50 w-full mt-2 bg-white border-2 border-gray-200 rounded-lg shadow-xl max-h-80 overflow-y-auto">
+                      {searchSuggestions.map((suggestion, index) => (
+                        <div
+                          key={`${suggestion.type}-${suggestion.value}-${index}`}
+                          onClick={() => handleSuggestionClick(suggestion)}
+                          className={`px-4 py-3 cursor-pointer border-b border-gray-100 hover:bg-blue-50 transition-colors ${
+                            index === selectedSuggestionIndex ? 'bg-blue-50' : ''
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            {/* Icon based on type */}
+                            <span className="text-lg">
+                              {suggestion.type === 'center' && '🏥'}
+                              {suggestion.type === 'location' && '📍'}
+                              {suggestion.type === 'service' && '💊'}
+                            </span>
+                            
+                            {/* Suggestion content */}
+                            <div className="flex-1">
+                              <div className="font-medium text-gray-900">
+                                {suggestion.value}
+                              </div>
+                              <div className="text-xs text-gray-500 capitalize">
+                                {suggestion.type === 'center' && 'Rehabilitation Center'}
+                                {suggestion.type === 'location' && 'Location'}
+                                {suggestion.type === 'service' && 'Service'}
+                              </div>
+                            </div>
+                            
+                            {/* Additional info for centers */}
+                            {suggestion.center && (
+                              <div className="text-xs text-gray-400">
+                                {suggestion.center.address.split(',')[0]}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="flex gap-2">
                   <button

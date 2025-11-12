@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import CenterMap from '@/components/CenterMap'
 import ExerciseVideos from '@/components/ExerciseVideos'
+import Link from 'next/link'
 import type { Centre, Country, State, CenterType, FilterState } from '@/types/center'
 
 export default function HomePage() {
@@ -731,12 +732,12 @@ const fetchData = async () => {
               <h2 className="text-xl font-semibold text-gray-900">
                 {userLocation ? 'Nearest Rehabilitation Centers' : 'Featured Rehabilitation Centers'}
               </h2>
-              <a 
+              <Link 
                 href="/centres"
                 className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors font-medium"
               >
                 View All {centres.length} Centers
-              </a>
+              </Link>
             </div>
             <p className="text-gray-600 text-sm mt-2">
               {userLocation && `Showing the 6 closest centers to your location`}
@@ -847,13 +848,13 @@ const fetchData = async () => {
                           📍 Mapped
                         </span>
                       )}
-                      <a
-                        href="/centres"
+                      <Link
+                        href={`/centres/${centre.id}`}
                         className="text-blue-600 hover:text-blue-800 text-sm font-medium"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        View All Details
-                      </a>
+                        View All Details →
+                      </Link>
                     </div>
                   </div>
                 </div>

@@ -1,4 +1,6 @@
-// src/types/center.ts - Shared type definitions
+// src/types/center.ts - Updated with Extended Types for Detail Pages
+
+// Base Centre interface (what's in the database)
 export interface Centre {
   id: string
   name: string
@@ -9,9 +11,9 @@ export interface Centre {
   email?: string | null
   website?: string | null
   services?: string | null
-  accessibility: boolean  // Keep in database but won't show in UI
+  accessibility: boolean
   country_id: string
-  state_id?: string | null  // NEW: For Malaysian state filtering
+  state_id?: string | null
   city_id?: string | null
   center_type_id: string
   active: boolean
@@ -20,13 +22,32 @@ export interface Centre {
   distance?: number  // Added for location-based sorting
 }
 
+// Extended Centre interface with joined relations (for detail pages)
+export interface CentreWithRelations extends Centre {
+  countries?: {
+    id: string
+    name: string
+    code: string
+  } | null
+  states?: {
+    id: string
+    name: string
+    code: string
+    country_id: string
+  } | null
+  center_types?: {
+    id: string
+    name: string
+    description: string
+  } | null
+}
+
 export interface Country {
   id: string
   name: string
   code: string
 }
 
-// NEW: State interface for Malaysian states
 export interface State {
   id: string
   name: string
@@ -41,13 +62,11 @@ export interface CenterType {
   description: string
 }
 
-// UPDATED: Removed accessibility, added state
 export interface FilterState {
   country: string
-  state: string  // NEW: For state filtering
+  state: string
   type: string
   search: string
-  // accessibility removed - no longer used in UI
 }
 
 // For Google Maps component compatibility

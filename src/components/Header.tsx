@@ -1,4 +1,4 @@
-// src/components/Header.tsx - Updated with Admin Navigation (Hydration Safe)
+// src/components/Header.tsx - FIXED: No Hydration Errors + Contact Link
 'use client'
 
 import Link from 'next/link'
@@ -19,27 +19,29 @@ export default function Header() {
   const navItems = [
     { name: 'Home', href: '/' },
     { name: 'Find Centres', href: '/centres' },
-    { name: 'Resources', href: '/#resources' },  // ✅ CHANGED: Now scrolls to resources section
-    { name: 'Contact', href: '/contact' }
+    { name: 'About', href: '/about' },
+    { name: 'Resources', href: '/#resources' },
+    { name: 'Contact', href: '/contact' },  // ← ADDED
   ]
 
   const adminNavItems = [
     { name: 'Dashboard', href: '/admin' },
     { name: 'Centers', href: '/admin/centers' },
-    { name: 'Import', href: '/admin/import' },
-    { name: 'Geocoding', href: '/admin/geocoding' },
-    { name: 'Settings', href: '/admin/settings' },
-    { name: 'Cleanup Duplicates', href: '/admin/cleanup-duplicates' }
-    
+    { name: 'Contact Forms', href: '/admin/contact-submissions' },  // ← ADDED
+    // { name: 'Import', href: '/admin/import' },
+    // { name: 'Geocoding', href: '/admin/geocoding' },
+    // { name: 'Settings', href: '/admin/settings' },
+    // { name: 'Cleanup Duplicates', href: '/admin/cleanup-duplicates' }
   ]
 
-  // Prevent hydration mismatch by not rendering dynamic content until mounted
+  // 🔧 FIX: Show skeleton loaders instead of nav items during SSR
+  // This prevents hydration mismatch because skeleton is same on server & client
   if (!mounted) {
     return (
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            {/* Logo */}
+            {/* Logo - always the same */}
             <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
               <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
                 <span className="text-white font-bold text-lg">R</span>
@@ -47,18 +49,17 @@ export default function Header() {
               <span className="text-xl font-bold text-gray-900">RehabFinder</span>
             </Link>
 
-            {/* Static navigation for initial render */}
-            <nav className="hidden md:flex space-x-8">
-              {navItems.map((item) => (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 transition-colors duration-200"
-                >
-                  {item.name}
-                </Link>
-              ))}
-            </nav>
+            {/* 🔧 SKELETON LOADERS instead of actual nav items */}
+            <div className="hidden md:flex items-center space-x-1">
+              {/* Admin toggle skeleton */}
+              <div className="h-9 w-20 bg-gray-200 animate-pulse rounded mr-4"></div>
+              {/* Nav items skeleton - added one more for Contact */}
+              <div className="h-9 w-16 bg-gray-200 animate-pulse rounded"></div>
+              <div className="h-9 w-24 bg-gray-200 animate-pulse rounded"></div>
+              <div className="h-9 w-16 bg-gray-200 animate-pulse rounded"></div>
+              <div className="h-9 w-20 bg-gray-200 animate-pulse rounded"></div>
+              <div className="h-9 w-20 bg-gray-200 animate-pulse rounded"></div>
+            </div>
 
             {/* Mobile menu button */}
             <div className="md:hidden">
@@ -74,6 +75,7 @@ export default function Header() {
     )
   }
 
+  // After mounting, render the actual navigation
   return (
     <header className="bg-white shadow-sm border-b border-gray-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

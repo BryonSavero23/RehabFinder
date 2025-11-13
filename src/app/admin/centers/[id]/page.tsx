@@ -1,10 +1,11 @@
-// src/app/admin/centers/[id]/page.tsx - Enhanced with URL Validation
+// src/app/admin/centers/[id]/page.tsx - Enhanced with Google Places Verification
 'use client'
 
 import { use, useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
+import GooglePlacesVerifier from '@/components/GooglePlacesVerifier'
 
 interface Centre {
   id: string
@@ -38,6 +39,18 @@ interface CenterType {
 
 interface EditCenterPageProps {
   params: Promise<{ id: string }>
+}
+
+interface VerifiedData {
+  name: string
+  address: string
+  latitude: number
+  longitude: number
+  phone?: string
+  website?: string
+  businessType?: string
+  placeId?: string
+  services?: string
 }
 
 export default function EditCenterPage(props: EditCenterPageProps) {
@@ -174,6 +187,96 @@ export default function EditCenterPage(props: EditCenterPageProps) {
     }
   }
 
+  // NEW: Handle Google Places verification
+  const handleGoogleVerification = async (verifiedData: VerifiedData) => {
+    try {
+      setSaving(true)
+      setError(null)
+
+      console.log('🔍 Received verification data:', verifiedData)
+
+      // Map Google business type to your center_type_id
+      let centerTypeId = formData.center_type_id
+      if (verifiedData.businessType && verifiedData.businessType.trim()) {
+        const businessType = verifiedData.businessType.toLowerCase()
+        const matchingType = centerTypes.find(
+          t => t.name.toLowerCase() === businessType
+        )
+        if (matchingType) {
+          centerTypeId = matchingType.id
+        }
+      }
+
+      // Format website URL
+      let websiteUrl = null
+      if (verifiedData.website) {
+        websiteUrl = validateAndFormatUrl(verifiedData.website)
+      }
+
+      console.log('💾 Applying verified data to form...')
+
+      // Update form data with verified information
+      const updatedFormData = {
+        ...formData,
+        name: verifiedData.name || formData.name,
+        address: verifiedData.address || formData.address,
+        latitude: verifiedData.latitude?.toString() || formData.latitude,
+        longitude: verifiedData.longitude?.toString() || formData.longitude,
+        phone: verifiedData.phone || formData.phone,
+        website: websiteUrl || formData.website,
+        services: verifiedData.services || formData.services,
+        center_type_id: centerTypeId,
+        verified: true // Mark as verified since we got Google data
+      }
+
+      setFormData(updatedFormData)
+
+      // Save to database immediately
+      const updateData = {
+        name: verifiedData.name,
+        address: verifiedData.address,
+        latitude: verifiedData.latitude,
+        longitude: verifiedData.longitude,
+        phone: verifiedData.phone || null,
+        website: websiteUrl,
+        services: verifiedData.services || null,
+        center_type_id: centerTypeId,
+        verified: true
+      }
+
+      console.log('💾 Saving Google verified data to database:', updateData)
+
+      const { error: updateError } = await supabase
+        .from('rehabilitation_centers')
+        .update(updateData)
+        .eq('id', centerId)
+
+      if (updateError) {
+        console.error('❌ Supabase update error:', updateError)
+        throw new Error(updateError.message || 'Database update failed')
+      }
+
+      console.log('✅ Google verified data saved successfully!')
+
+      setSuccess(true)
+      setTimeout(() => setSuccess(false), 3000)
+
+      // Refresh data
+      await fetchData()
+
+    } catch (err: any) {
+      console.error('❌ Error applying Google verification:', err)
+      console.error('Error details:', {
+        message: err?.message,
+        name: err?.name,
+        stack: err?.stack
+      })
+      setError(err?.message || 'Failed to apply verification')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const handleSave = async () => {
     try {
       setSaving(true)
@@ -273,9 +376,16 @@ export default function EditCenterPage(props: EditCenterPageProps) {
       setSuccess(true)
       setTimeout(() => setSuccess(false), 3000)
 
-    } catch (err) {
+    } catch (err: any) {
       console.error('❌ Error updating center:', err)
-      setError(err instanceof Error ? err.message : 'Failed to update center')
+      console.error('Error details:', {
+        message: err?.message,
+        name: err?.name,
+        code: err?.code,
+        details: err?.details,
+        hint: err?.hint
+      })
+      setError(err?.message || 'Failed to update center')
     } finally {
       setSaving(false)
     }
@@ -424,6 +534,19 @@ export default function EditCenterPage(props: EditCenterPageProps) {
                     rows={3}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                     placeholder="Enter full address"
+                  />
+                </div>
+
+                {/* NEW: Google Places Verifier Component */}
+                <div className="my-6">
+                  <GooglePlacesVerifier
+                    centerId={centerId}
+                    centerName={formData.name}
+                    currentAddress={formData.address}
+                    currentType={getCenterTypeName(formData.center_type_id)}
+                    latitude={center?.latitude}
+                    longitude={center?.longitude}
+                    onVerified={handleGoogleVerification}
                   />
                 </div>
 

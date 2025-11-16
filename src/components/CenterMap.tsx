@@ -1,4 +1,4 @@
-// src/components/CenterMap.tsx - Fixed TypeScript version
+// src/components/CenterMap.tsx - Fixed TypeScript version with AUTO-OPEN InfoWindow
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
@@ -360,9 +360,11 @@ export default function CenterMap({
     })
   }
 
+  // 🔧 FIXED: Now tracks first marker and auto-opens InfoWindow for single results
   const addCenterMarkersWithBatchGeocoding = async (map: any, centers: Centre[]) => {
     const bounds = new window.google.maps.LatLngBounds()
     let markersAdded = 0
+    let firstMarker: any = null  // Track first marker for auto-open
 
     // Separate centers with and without coordinates
     const centersWithCoords = centers.filter(center => 
@@ -382,14 +384,20 @@ export default function CenterMap({
     centersWithCoords.forEach(center => {
       if (center.latitude && center.longitude) {
         const position = { lat: center.latitude, lng: center.longitude }
-        addMarkerToMap(map, center, position, bounds)
+        const marker = addMarkerToMap(map, center, position, bounds)  // Capture returned marker
+        if (!firstMarker) {  // Store first marker
+          firstMarker = marker
+        }
         markersAdded++
       }
     })
 
     // Batch geocode centers that need coordinates (limit to first 20 for performance)
     if (centersNeedingGeocode.length > 0) {
-      await batchGeocodeAndSaveCenters(map, centersNeedingGeocode.slice(0, 20), bounds)
+      const geocodedMarker = await batchGeocodeAndSaveCenters(map, centersNeedingGeocode.slice(0, 20), bounds)
+      if (!firstMarker && geocodedMarker) {  // Use geocoded marker if no coords marker
+        firstMarker = geocodedMarker
+      }
     }
 
     // Fit map to show all markers if no user location
@@ -405,12 +413,22 @@ export default function CenterMap({
       })
     }
 
+    // 🔧 NEW: Auto-open InfoWindow for single search result
+    if (centers.length === 1 && firstMarker) {
+      // Small delay to ensure map is fully loaded and positioned
+      setTimeout(() => {
+        window.google.maps.event.trigger(firstMarker, 'click')
+      }, 300)
+    }
+
     console.log(`Total markers added: ${markersAdded}`)
   }
 
-  const batchGeocodeAndSaveCenters = async (map: any, centers: Centre[], bounds: any) => {
+  // 🔧 FIXED: Now returns first marker created
+  const batchGeocodeAndSaveCenters = async (map: any, centers: Centre[], bounds: any): Promise<any> => {
     const batchSize = 5
     const delay = 300
+    let firstMarker: any = null  // Track first marker
 
     setGeocodingStats({
       total: centers.length,
@@ -430,7 +448,10 @@ export default function CenterMap({
             
             if (position) {
               await updateCenterCoordinates(center.id, position.lat, position.lng)
-              addMarkerToMap(map, center, position, bounds)
+              const marker = addMarkerToMap(map, center, position, bounds)  // Capture marker
+              if (!firstMarker) {  // Store first marker
+                firstMarker = marker
+              }
               
               setGeocodingStats(prev => ({
                 ...prev,
@@ -465,6 +486,7 @@ export default function CenterMap({
     }
 
     setGeocodingStats(prev => ({ ...prev, isActive: false }))
+    return firstMarker  // Return first marker for auto-open
   }
 
   const geocodeAddress = (address: string, country: string): Promise<{ lat: number; lng: number } | null> => {
@@ -512,7 +534,8 @@ export default function CenterMap({
     }
   }
 
-  const addMarkerToMap = (map: any, center: Centre, position: { lat: number; lng: number }, bounds: any) => {
+  // 🔧 FIXED: Now returns the marker object for tracking
+  const addMarkerToMap = (map: any, center: Centre, position: { lat: number; lng: number }, bounds: any): any => {
     const centerType = getCenterTypeName(center.center_type_id)
     
     const marker = new window.google.maps.Marker({
@@ -547,6 +570,7 @@ export default function CenterMap({
 
     markersRef.current.push(marker)
     bounds.extend(position)
+    return marker  // Return marker for tracking
   }
 
   const getMarkerColor = (type: string): string => {

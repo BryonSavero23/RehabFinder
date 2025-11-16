@@ -46,125 +46,125 @@ export default function HomePage() {
     fetchData()
   }, [])
 
-const fetchData = async () => {
-  try {
-    setLoading(true)
-    setError(null)
+  const fetchData = async () => {
+    try {
+      setLoading(true)
+      setError(null)
 
-    // Fetch ALL centers using pagination
-    const fetchAllCenters = async () => {
-      let allCenters: Centre[] = []
-      let from = 0
-      const pageSize = 1000
-      
-      console.log('🔄 Starting pagination fetch...')
-      
-      while (true) {
-        const { data, error } = await supabase
-          .from('rehabilitation_centers')
-          .select('*')
-          .eq('active', true)
-          .range(from, from + pageSize - 1)
-          .order('name')
-        
-        if (error) {
-          console.error('Supabase error:', error)
-          throw error
+      // Fetch ALL centers using pagination
+      const fetchAllCenters = async () => {
+        let allCenters: Centre[] = []
+        let from = 0
+        const pageSize = 1000
+
+        console.log('🔄 Starting pagination fetch...')
+
+        while (true) {
+          const { data, error } = await supabase
+            .from('rehabilitation_centers')
+            .select('*')
+            .eq('active', true)
+            .range(from, from + pageSize - 1)
+            .order('name')
+
+          if (error) {
+            console.error('Supabase error:', error)
+            throw error
+          }
+          if (!data || data.length === 0) break
+
+          allCenters = [...allCenters, ...data]
+          console.log(`📦 Batch: ${data.length} | Total: ${allCenters.length}`)
+
+          if (data.length < pageSize) break
+          from += pageSize
         }
-        if (!data || data.length === 0) break
-        
-        allCenters = [...allCenters, ...data]
-        console.log(`📦 Batch: ${data.length} | Total: ${allCenters.length}`)
-        
-        if (data.length < pageSize) break
-        from += pageSize
-      }
-      
-      // 🔍 DEBUG: Check for duplicate IDs in the raw data
-      const idCount = new Map<string, number>()
-      allCenters.forEach(center => {
-        idCount.set(center.id, (idCount.get(center.id) || 0) + 1)
-      })
-      
-      const duplicateIds = Array.from(idCount.entries()).filter(([id, count]) => count > 1)
-      if (duplicateIds.length > 0) {
-        console.warn('⚠️ DUPLICATE IDs FOUND IN DATABASE:', duplicateIds)
-        duplicateIds.forEach(([id, count]) => {
-          const dupes = allCenters.filter(c => c.id === id)
-          console.warn(`ID: ${id} appears ${count} times:`, dupes.map(d => d.name))
+
+        // 🔍 DEBUG: Check for duplicate IDs in the raw data
+        const idCount = new Map<string, number>()
+        allCenters.forEach(center => {
+          idCount.set(center.id, (idCount.get(center.id) || 0) + 1)
         })
-      }
-      
-      // 🔍 DEBUG: Check for duplicate names (same name but different IDs)
-      const nameCount = new Map<string, Centre[]>()
-      allCenters.forEach(center => {
-        const existing = nameCount.get(center.name) || []
-        nameCount.set(center.name, [...existing, center])
-      })
-      
-      const duplicateNames = Array.from(nameCount.entries()).filter(([name, centers]) => centers.length > 1)
-      if (duplicateNames.length > 0) {
-        console.warn('⚠️ DUPLICATE NAMES FOUND (different IDs):', duplicateNames.length)
-        console.warn('💡 These are likely the same centers imported multiple times with different IDs.')
-        console.warn('🔧 Recommendation: Clean up your database to remove duplicate center names.')
-        duplicateNames.slice(0, 5).forEach(([name, centers]) => {
-          console.warn(`Name: "${name}" appears ${centers.length} times with IDs:`, centers.map(c => c.id))
-        })
-        if (duplicateNames.length > 5) {
-          console.warn(`... and ${duplicateNames.length - 5} more duplicate names`)
+
+        const duplicateIds = Array.from(idCount.entries()).filter(([id, count]) => count > 1)
+        if (duplicateIds.length > 0) {
+          console.warn('⚠️ DUPLICATE IDs FOUND IN DATABASE:', duplicateIds)
+          duplicateIds.forEach(([id, count]) => {
+            const dupes = allCenters.filter(c => c.id === id)
+            console.warn(`ID: ${id} appears ${count} times:`, dupes.map(d => d.name))
+          })
         }
+
+        // 🔍 DEBUG: Check for duplicate names (same name but different IDs)
+        const nameCount = new Map<string, Centre[]>()
+        allCenters.forEach(center => {
+          const existing = nameCount.get(center.name) || []
+          nameCount.set(center.name, [...existing, center])
+        })
+
+        const duplicateNames = Array.from(nameCount.entries()).filter(([name, centers]) => centers.length > 1)
+        if (duplicateNames.length > 0) {
+          console.warn('⚠️ DUPLICATE NAMES FOUND (different IDs):', duplicateNames.length)
+          console.warn('💡 These are likely the same centers imported multiple times with different IDs.')
+          console.warn('🔧 Recommendation: Clean up your database to remove duplicate center names.')
+          duplicateNames.slice(0, 5).forEach(([name, centers]) => {
+            console.warn(`Name: "${name}" appears ${centers.length} times with IDs:`, centers.map(c => c.id))
+          })
+          if (duplicateNames.length > 5) {
+            console.warn(`... and ${duplicateNames.length - 5} more duplicate names`)
+          }
+        }
+
+        return allCenters
       }
-      
-      return allCenters
-    }
 
-    const [centres, countriesResult, statesResult, typesResult] = await Promise.all([
-      fetchAllCenters(),
-      supabase.from('countries').select('*').order('name'),
-      supabase.from('states').select('*').order('name'),
-      supabase.from('center_types').select('*').order('name')
-    ])
+      const [centres, countriesResult, statesResult, typesResult] = await Promise.all([
+        fetchAllCenters(),
+        supabase.from('countries').select('*').order('name'),
+        supabase.from('states').select('*').order('name'),
+        supabase.from('center_types').select('*').order('name')
+      ])
 
-    if (countriesResult.error) {
-      console.error('Countries error:', countriesResult.error)
-      throw countriesResult.error
-    }
-    if (statesResult.error) {
-      console.error('States error:', statesResult.error)
-      throw statesResult.error
-    }
-    if (typesResult.error) {
-      console.error('Center types error:', typesResult.error)
-      throw typesResult.error
-    }
+      if (countriesResult.error) {
+        console.error('Countries error:', countriesResult.error)
+        throw countriesResult.error
+      }
+      if (statesResult.error) {
+        console.error('States error:', statesResult.error)
+        throw statesResult.error
+      }
+      if (typesResult.error) {
+        console.error('Center types error:', typesResult.error)
+        throw typesResult.error
+      }
 
-    console.log('✅ Total loaded:', centres.length)
+      console.log('✅ Total loaded:', centres.length)
 
-    setCentres(centres)
-    setCountries(countriesResult.data || [])
-    setStates(statesResult.data || [])
-    setCenterTypes(typesResult.data || [])
+      setCentres(centres)
+      setCountries(countriesResult.data || [])
+      setStates(statesResult.data || [])
+      setCenterTypes(typesResult.data || [])
 
-  } catch (err) {
-    // FIXED: Better error handling for network and database errors
-    console.error('Error fetching data:', err)
-    
-    let errorMessage = 'Failed to load data'
-    
-    // Handle different error types
-    if (err instanceof TypeError && err.message.includes('fetch')) {
-      errorMessage = 'Network Error: Cannot connect to database. Please check your internet connection and Supabase configuration.'
-    } else if (err && typeof err === 'object' && 'message' in err) {
-      errorMessage = (err as any).message || 'Database error occurred'
-    } else if (err instanceof Error) {
-      errorMessage = err.message
+    } catch (err) {
+      // FIXED: Better error handling for network and database errors
+      console.error('Error fetching data:', err)
+
+      let errorMessage = 'Failed to load data'
+
+      // Handle different error types
+      if (err instanceof TypeError && err.message.includes('fetch')) {
+        errorMessage = 'Network Error: Cannot connect to database. Please check your internet connection and Supabase configuration.'
+      } else if (err && typeof err === 'object' && 'message' in err) {
+        errorMessage = (err as any).message || 'Database error occurred'
+      } else if (err instanceof Error) {
+        errorMessage = err.message
+      }
+
+      setError(errorMessage)
+    } finally {
+      setLoading(false)
     }
-    
-    setError(errorMessage)
-  } finally {
-    setLoading(false)
   }
-}
 
   // NEW: Generate autocomplete suggestions
   useEffect(() => {
@@ -183,7 +183,7 @@ const fetchData = async () => {
 
     // Get center name suggestions
     const centerMatches = centres
-      .filter(centre => 
+      .filter(centre =>
         centre.name.toLowerCase().includes(searchTerm) && centre.active
       )
       .slice(0, 5)
@@ -207,7 +207,7 @@ const fetchData = async () => {
           })
         }
       })
-    
+
     const locationMatches = Array.from(locationSet)
       .slice(0, 5)
       .map(location => ({
@@ -250,7 +250,7 @@ const fetchData = async () => {
     setFilters({ ...filters, search: suggestion.value })
     setShowSuggestions(false)
     setSelectedSuggestionIndex(-1)
-    
+
     // If it's a center suggestion, scroll to it
     if (suggestion.center) {
       setSelectedCenter(suggestion.center)
@@ -264,7 +264,7 @@ const fetchData = async () => {
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault()
-        setSelectedSuggestionIndex(prev => 
+        setSelectedSuggestionIndex(prev =>
           prev < searchSuggestions.length - 1 ? prev + 1 : prev
         )
         break
@@ -302,7 +302,7 @@ const fetchData = async () => {
     const R = 6371 // Radius of the Earth in kilometers
     const dLat = (lat2 - lat1) * Math.PI / 180
     const dLon = (lon2 - lon1) * Math.PI / 180
-    const a = 
+    const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
       Math.sin(dLon / 2) * Math.sin(dLon / 2)
@@ -317,7 +317,7 @@ const fetchData = async () => {
 
     if (filters.search) {
       const searchTerm = filters.search.toLowerCase()
-      filtered = filtered.filter(centre => 
+      filtered = filtered.filter(centre =>
         centre.name.toLowerCase().includes(searchTerm) ||
         centre.address.toLowerCase().includes(searchTerm) ||
         (centre.services && centre.services.toLowerCase().includes(searchTerm))
@@ -386,9 +386,9 @@ const fetchData = async () => {
 
       // Add centers without coordinates at the end
       const centresWithoutCoords = uniqueCentres.filter(centre => !centre.latitude || !centre.longitude)
-      
+
       console.log(`📍 Sorted by distance from user location: ${centresWithDistance.length} centers with coords, ${centresWithoutCoords.length} without`)
-      
+
       return [...centresWithDistance, ...centresWithoutCoords]
     }
 
@@ -398,17 +398,17 @@ const fetchData = async () => {
   // Get featured centers (first 6 filtered results)
   const featuredCentres = useMemo(() => {
     const featured = filteredCentres.slice(0, 6)
-    
+
     // 🔍 DEBUG: Log the featured centers
     console.log('⭐ Featured centers:', featured.map(c => ({ id: c.id, name: c.name })))
-    
+
     // Check for duplicates in featured
     const featuredIds = featured.map(c => c.id)
     const duplicateFeatured = featuredIds.filter((id, index) => featuredIds.indexOf(id) !== index)
     if (duplicateFeatured.length > 0) {
       console.error('❌ DUPLICATES IN FEATURED LIST:', duplicateFeatured)
     }
-    
+
     return featured
   }, [filteredCentres])
 
@@ -419,7 +419,7 @@ const fetchData = async () => {
     }
 
     setLoadingLocation(true)
-    
+
     navigator.geolocation.getCurrentPosition(
       (position) => {
         setUserLocation({
@@ -503,7 +503,7 @@ const fetchData = async () => {
               <li>Check Supabase project status at supabase.com</li>
             </ul>
           </div>
-          <button 
+          <button
             onClick={fetchData}
             className="bg-blue-500 text-white px-6 py-3 rounded hover:bg-blue-600 font-semibold"
           >
@@ -550,17 +550,19 @@ const fetchData = async () => {
                     }}
                     className="w-full px-4 py-3 text-gray-900 outline-none rounded-md border-2 border-transparent focus:border-blue-500"
                   />
-                  
+
                   {/* Suggestions Dropdown */}
                   {showSuggestions && searchSuggestions.length > 0 && (
                     <div className="absolute z-50 w-full mt-2 bg-white border-2 border-gray-200 rounded-lg shadow-xl max-h-80 overflow-y-auto">
                       {searchSuggestions.map((suggestion, index) => (
                         <div
                           key={`${suggestion.type}-${suggestion.value}-${index}`}
-                          onClick={() => handleSuggestionClick(suggestion)}
-                          className={`px-4 py-3 cursor-pointer border-b border-gray-100 hover:bg-blue-50 transition-colors ${
-                            index === selectedSuggestionIndex ? 'bg-blue-50' : ''
-                          }`}
+                          onMouseDown={(e) => {
+                            e.preventDefault()
+                            handleSuggestionClick(suggestion)
+                          }}
+                          className={`px-4 py-3 cursor-pointer border-b border-gray-100 hover:bg-blue-50 transition-colors ${index === selectedSuggestionIndex ? 'bg-blue-50' : ''
+                            }`}
                         >
                           <div className="flex items-center gap-3">
                             {/* Icon based on type */}
@@ -569,7 +571,7 @@ const fetchData = async () => {
                               {suggestion.type === 'location' && '📍'}
                               {suggestion.type === 'service' && '💊'}
                             </span>
-                            
+
                             {/* Suggestion content */}
                             <div className="flex-1">
                               <div className="font-medium text-gray-900">
@@ -581,7 +583,7 @@ const fetchData = async () => {
                                 {suggestion.type === 'service' && 'Service'}
                               </div>
                             </div>
-                            
+
                             {/* Additional info for centers */}
                             {suggestion.center && (
                               <div className="text-xs text-gray-400">
@@ -689,7 +691,7 @@ const fetchData = async () => {
                 <div>
                   <h2 className="text-2xl font-bold text-gray-900">Explore Centers on Map</h2>
                   <p className="text-gray-600 mt-1">
-                    {userLocation 
+                    {userLocation
                       ? 'Interactive map showing centers sorted by distance from you'
                       : 'Interactive map showing all matching rehabilitation centers'
                     }
@@ -732,7 +734,7 @@ const fetchData = async () => {
               <h2 className="text-xl font-semibold text-gray-900">
                 {userLocation ? 'Nearest Rehabilitation Centers' : 'Featured Rehabilitation Centers'}
               </h2>
-              <Link 
+              <Link
                 href="/centres"
                 className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors font-medium"
               >
@@ -745,7 +747,7 @@ const fetchData = async () => {
               {!userLocation && !filters.search && 'Discover some of our featured rehabilitation centers'}
             </p>
           </div>
-          
+
           <div className="divide-y divide-gray-200">
             {featuredCentres.length === 0 ? (
               <div className="p-8 text-center">
@@ -754,7 +756,7 @@ const fetchData = async () => {
                 <p className="text-gray-600 mb-4">
                   Try adjusting your search criteria or clearing your filters.
                 </p>
-                <button 
+                <button
                   onClick={() => setFilters({ country: '', state: '', type: '', search: '' })}
                   className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
                 >
@@ -781,18 +783,18 @@ const fetchData = async () => {
                           </span>
                         )}
                       </div>
-                      
+
                       <div className="space-y-2 text-sm text-gray-600">
                         <div className="flex items-center gap-2">
                           <span>📍</span>
                           <span>{centre.address}</span>
                         </div>
-                        
+
                         <div className="flex items-center gap-2">
                           <span>🏥</span>
                           <span>{getCenterTypeName(centre.center_type_id)}</span>
                         </div>
-                        
+
                         <div className="flex items-center gap-2">
                           <span>🌍</span>
                           <span>
@@ -800,7 +802,7 @@ const fetchData = async () => {
                             {getStateName(centre.state_id) && ` • ${getStateName(centre.state_id)}`}
                           </span>
                         </div>
-                        
+
                         {centre.accessibility && (
                           <div className="flex items-center gap-2">
                             <span>♿</span>
@@ -810,7 +812,7 @@ const fetchData = async () => {
 
                         <div className="flex flex-wrap gap-4 mt-3">
                           {centre.phone && (
-                            <a 
+                            <a
                               href={`tel:${centre.phone}`}
                               className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
                               onClick={(e) => e.stopPropagation()}
@@ -819,7 +821,7 @@ const fetchData = async () => {
                             </a>
                           )}
                           {centre.email && (
-                            <a 
+                            <a
                               href={`mailto:${centre.email}`}
                               className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
                               onClick={(e) => e.stopPropagation()}
@@ -828,7 +830,7 @@ const fetchData = async () => {
                             </a>
                           )}
                           {centre.website && (
-                            <a 
+                            <a
                               href={centre.website.startsWith('http') ? centre.website : `https://${centre.website}`}
                               target="_blank"
                               rel="noopener noreferrer"
@@ -864,61 +866,61 @@ const fetchData = async () => {
         </div>
       </div>
 
-        {/* Comprehensive Rehabilitation Resources */}
-        <div id="resources" className="mb-12 max-w-7xl mx-auto px-4">
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">
-              Comprehensive Rehabilitation Resources
-            </h2>
-            <p className="text-xl text-gray-600">
-              Everything you need for your recovery journey
-            </p>
+      {/* Comprehensive Rehabilitation Resources */}
+      <div id="resources" className="mb-12 max-w-7xl mx-auto px-4">
+        <div className="text-center mb-8">
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">
+            Comprehensive Rehabilitation Resources
+          </h2>
+          <p className="text-xl text-gray-600">
+            Everything you need for your recovery journey
+          </p>
+        </div>
+
+        {/* Exercise Videos Section - NOW WITH YOUTUBE VIDEOS! */}
+        <div className="mb-12">
+          <ExerciseVideos />
+        </div>
+
+        {/* Other Resources */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Downloadable Toolkits */}
+          <div className="bg-white rounded-lg shadow-sm p-6 text-center">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-2xl">⬇️</span>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Downloadable Toolkits</h3>
+            <p className="text-gray-600 text-sm mb-4">Comprehensive resources for patients and families</p>
+            <button className="bg-green-500 text-white px-4 py-2 rounded text-sm hover:bg-green-600">
+              Coming Soon
+            </button>
           </div>
 
-          {/* Exercise Videos Section - NOW WITH YOUTUBE VIDEOS! */}
-          <div className="mb-12">
-            <ExerciseVideos />
+          {/* Support Groups */}
+          <div className="bg-white rounded-lg shadow-sm p-6 text-center">
+            <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-2xl">👥</span>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Support Groups</h3>
+            <p className="text-gray-600 text-sm mb-4">Connect with others on similar recovery journeys</p>
+            <button className="bg-purple-500 text-white px-4 py-2 rounded text-sm hover:bg-purple-600">
+              Coming Soon
+            </button>
           </div>
 
-          {/* Other Resources */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Downloadable Toolkits */}
-            <div className="bg-white rounded-lg shadow-sm p-6 text-center">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl">⬇️</span>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Downloadable Toolkits</h3>
-              <p className="text-gray-600 text-sm mb-4">Comprehensive resources for patients and families</p>
-              <button className="bg-green-500 text-white px-4 py-2 rounded text-sm hover:bg-green-600">
-                Coming Soon
-              </button>
+          {/* Traditional Healing Practices */}
+          <div className="bg-white rounded-lg shadow-sm p-6 text-center">
+            <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-2xl">🌿</span>
             </div>
-
-            {/* Support Groups */}
-            <div className="bg-white rounded-lg shadow-sm p-6 text-center">
-              <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl">👥</span>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Support Groups</h3>
-              <p className="text-gray-600 text-sm mb-4">Connect with others on similar recovery journeys</p>
-              <button className="bg-purple-500 text-white px-4 py-2 rounded text-sm hover:bg-purple-600">
-                Coming Soon
-              </button>
-            </div>
-
-            {/* Traditional Healing Practices */}
-            <div className="bg-white rounded-lg shadow-sm p-6 text-center">
-              <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl">🌿</span>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Traditional Healing Practices</h3>
-              <p className="text-gray-600 text-sm mb-4">Complementary and alternative medicine options</p>
-              <button className="bg-orange-500 text-white px-4 py-2 rounded text-sm hover:bg-orange-600">
-                Coming Soon
-              </button>
-            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Traditional Healing Practices</h3>
+            <p className="text-gray-600 text-sm mb-4">Complementary and alternative medicine options</p>
+            <button className="bg-orange-500 text-white px-4 py-2 rounded text-sm hover:bg-orange-600">
+              Coming Soon
+            </button>
           </div>
         </div>
+      </div>
 
       {/* Footer */}
       <footer className="bg-gray-800 text-white py-8">

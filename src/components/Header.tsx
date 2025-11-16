@@ -1,4 +1,4 @@
-// src/components/Header.tsx - FIXED: No Hydration Errors + Contact Link
+// src/components/Header.tsx - UPDATED: Added Data Quality Link
 'use client'
 
 import Link from 'next/link'
@@ -21,13 +21,14 @@ export default function Header() {
     { name: 'Find Centres', href: '/centres' },
     { name: 'About', href: '/about' },
     { name: 'Resources', href: '/#resources' },
-    { name: 'Contact', href: '/contact' },  // ← ADDED
+    { name: 'Contact', href: '/contact' },
   ]
 
   const adminNavItems = [
     { name: 'Dashboard', href: '/admin' },
     { name: 'Centers', href: '/admin/centers' },
-    { name: 'Contact Forms', href: '/admin/contact-submissions' },  // ← ADDED
+    { name: 'Data Quality', href: '/admin/data-quality' },  // ← ADDED
+    { name: 'Contact Forms', href: '/admin/contact-submissions' },
     // { name: 'Import', href: '/admin/import' },
     // { name: 'Geocoding', href: '/admin/geocoding' },
     // { name: 'Settings', href: '/admin/settings' },
@@ -53,12 +54,11 @@ export default function Header() {
             <div className="hidden md:flex items-center space-x-1">
               {/* Admin toggle skeleton */}
               <div className="h-9 w-20 bg-gray-200 animate-pulse rounded mr-4"></div>
-              {/* Nav items skeleton - added one more for Contact */}
+              {/* Nav items skeleton - updated count for Data Quality */}
               <div className="h-9 w-16 bg-gray-200 animate-pulse rounded"></div>
               <div className="h-9 w-24 bg-gray-200 animate-pulse rounded"></div>
-              <div className="h-9 w-16 bg-gray-200 animate-pulse rounded"></div>
-              <div className="h-9 w-20 bg-gray-200 animate-pulse rounded"></div>
-              <div className="h-9 w-20 bg-gray-200 animate-pulse rounded"></div>
+              <div className="h-9 w-24 bg-gray-200 animate-pulse rounded"></div>
+              <div className="h-9 w-28 bg-gray-200 animate-pulse rounded"></div>
             </div>
 
             {/* Mobile menu button */}

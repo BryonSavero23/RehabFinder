@@ -1,4 +1,4 @@
-// src/app/admin/page.tsx - Admin Dashboard with Search Bar (Fixed Location & Admin Colors)
+// src/app/admin/page.tsx - Admin Dashboard with Filtered Recent Centers List
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
@@ -72,7 +72,6 @@ interface FilterState {
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
-  const [recentCenters, setRecentCenters] = useState<RecentCenter[]>([])
   const [allCenters, setAllCenters] = useState<Centre[]>([])
   const [countries, setCountries] = useState<Country[]>([])
   const [states, setStates] = useState<State[]>([])
@@ -162,6 +161,11 @@ export default function AdminDashboard() {
     return filtered
   }, [allCenters, filters, userLocation])
 
+  // NEW: Get filtered centers for the Recent Centers list (first 10)
+  const displayedCenters = useMemo(() => {
+    return filteredCenters.slice(0, 10)
+  }, [filteredCenters])
+
   // FIXED: Use My Location handler
   const handleUseLocation = () => {
     setLoadingLocation(true)
@@ -179,68 +183,50 @@ export default function AdminDashboard() {
           lng: position.coords.longitude
         })
         setLoadingLocation(false)
-        console.log('✅ Location detected:', position.coords.latitude, position.coords.longitude)
       },
       (error) => {
-        console.error('❌ Geolocation error:', error)
-        let errorMessage = 'Unable to retrieve your location. '
-        switch(error.code) {
-          case error.PERMISSION_DENIED:
-            errorMessage += 'Please allow location access in your browser settings.'
-            break
-          case error.POSITION_UNAVAILABLE:
-            errorMessage += 'Location information is unavailable.'
-            break
-          case error.TIMEOUT:
-            errorMessage += 'Location request timed out.'
-            break
-        }
-        alert(errorMessage)
+        console.error('Error getting location:', error)
+        alert('Unable to retrieve your location. Please try again.')
         setLoadingLocation(false)
       },
       {
         enableHighAccuracy: true,
         timeout: 10000,
-        maximumAge: 0
+        maximumAge: 300000
       }
     )
-  }
-
-  const handleSearch = () => {
-    console.log('Search triggered with:', filters.search)
   }
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true)
+      setError(null)
 
-      // Fetch ALL active centers for map (with pagination)
+      // Fetch ALL active centers with pagination
       const fetchAllActiveCenters = async () => {
         let allCenters: Centre[] = []
         let from = 0
         const pageSize = 1000
-
+        
         while (true) {
           const { data, error } = await supabase
             .from('rehabilitation_centers')
             .select('*')
             .eq('active', true)
             .range(from, from + pageSize - 1)
-            .order('name')
-
+            .order('created_at', { ascending: false })
+          
           if (error) throw error
           if (!data || data.length === 0) break
-
+          
           allCenters = [...allCenters, ...data]
-
           if (data.length < pageSize) break
           from += pageSize
         }
-
+        
         return allCenters
       }
 
-      // Fetch statistics and data in parallel
       const [
         centersResult,
         activeCentersResult,
@@ -250,7 +236,6 @@ export default function AdminDashboard() {
         countriesResult,
         statesResult,
         typesResult,
-        recentCentersResult,
         activeCenters
       ] = await Promise.all([
         supabase.from('rehabilitation_centers').select('id', { count: 'exact', head: true }),
@@ -261,11 +246,6 @@ export default function AdminDashboard() {
         supabase.from('countries').select('*').order('name'),
         supabase.from('states').select('*').order('name'),
         supabase.from('center_types').select('*').order('name'),
-        supabase
-          .from('rehabilitation_centers')
-          .select('id, name, address, created_at, verified, latitude, longitude')
-          .order('created_at', { ascending: false })
-          .limit(10),
         fetchAllActiveCenters()
       ])
 
@@ -280,7 +260,6 @@ export default function AdminDashboard() {
       }
 
       setStats(dashboardStats)
-      setRecentCenters(recentCentersResult.data || [])
       setAllCenters(activeCenters)
       setCountries(countriesResult.data || [])
       setStates(statesResult.data || [])
@@ -337,156 +316,125 @@ export default function AdminDashboard() {
             </div>
             <Link
               href="/"
-              className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 flex items-center gap-2"
+              className="text-blue-600 hover:text-blue-800 font-medium"
             >
-              🏠 Back to Site
+              → View Public Site
             </Link>
           </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
+        {/* Stats Grid */}
+        <div className="grid md:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white rounded-lg shadow-sm border p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Centers</p>
-                <p className="text-2xl font-bold text-gray-900">{stats?.totalCenters || 0}</p>
+                <p className="text-gray-600 text-sm">Total Centers</p>
+                <p className="text-3xl font-bold text-gray-900">{stats?.totalCenters || 0}</p>
               </div>
-              <div className="p-3 bg-blue-100 rounded-full">
-                <span className="text-2xl">🏥</span>
-              </div>
+              <div className="text-blue-500 text-3xl">🏥</div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
+          <div className="bg-white rounded-lg shadow-sm border p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Active Centers</p>
-                <p className="text-2xl font-bold text-green-600">{stats?.activeCenters || 0}</p>
+                <p className="text-gray-600 text-sm">Active Centers</p>
+                <p className="text-3xl font-bold text-green-600">{stats?.activeCenters || 0}</p>
               </div>
-              <div className="p-3 bg-green-100 rounded-full">
-                <span className="text-2xl">✅</span>
-              </div>
+              <div className="text-green-500 text-3xl">✓</div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
+          <div className="bg-white rounded-lg shadow-sm border p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Verified Centers</p>
-                <p className="text-2xl font-bold text-purple-600">{stats?.verifiedCenters || 0}</p>
+                <p className="text-gray-600 text-sm">Verified</p>
+                <p className="text-3xl font-bold text-blue-600">{stats?.verifiedCenters || 0}</p>
               </div>
-              <div className="p-3 bg-purple-100 rounded-full">
-                <span className="text-2xl">🔐</span>
-              </div>
+              <div className="text-blue-500 text-3xl">🔒</div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
+          <div className="bg-white rounded-lg shadow-sm border p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Need Geocoding</p>
-                <p className="text-2xl font-bold text-orange-600">{stats?.centersNeedingGeocode || 0}</p>
+                <p className="text-gray-600 text-sm">Need Geocode</p>
+                <p className="text-3xl font-bold text-orange-600">{stats?.centersNeedingGeocode || 0}</p>
               </div>
-              <div className="p-3 bg-orange-100 rounded-full">
-                <span className="text-2xl">📍</span>
-              </div>
+              <div className="text-orange-500 text-3xl">📍</div>
             </div>
           </div>
         </div>
 
-        {/* SEARCH BAR AND FILTERS - ADMIN STYLE (WHITE BACKGROUND) */}
-        <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Search & Filter Centers</h3>
+        {/* Search & Filter Bar */}
+        <div className="bg-white rounded-lg shadow-sm border mb-8 p-6">
+          <h3 className="font-semibold text-gray-900 mb-4">Search & Filter Centers</h3>
           
-          {/* Search Box */}
-          <div className="mb-4">
-            <div className="flex flex-col sm:flex-row gap-2">
-              <div className="flex-1">
-                <input
-                  type="text"
-                  placeholder="Search by location, name, or services... (e.g., Cheras, KL, addiction)"
-                  value={filters.search}
-                  onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                />
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={handleUseLocation}
-                  disabled={loadingLocation}
-                  className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2 whitespace-nowrap transition-colors"
-                >
-                  <span>📍</span>
-                  {loadingLocation ? 'Finding...' : 'Use My Location'}
-                </button>
-                <button
-                  onClick={handleSearch}
-                  className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 font-semibold transition-colors"
-                >
-                  Search
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Filter Dropdowns */}
-          <div className="flex flex-wrap gap-3 mb-4">
+          <div className="grid md:grid-cols-5 gap-4 mb-4">
+            <input
+              type="text"
+              placeholder="Search centers..."
+              value={filters.search}
+              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+            
             <select
               value={filters.country}
               onChange={(e) => setFilters({ ...filters, country: e.target.value, state: '' })}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">All Countries</option>
-              {countries.map((country) => (
-                <option key={country.id} value={country.id}>
-                  {country.name}
-                </option>
+              {countries.map(country => (
+                <option key={country.id} value={country.id}>{country.name}</option>
               ))}
             </select>
 
-            {availableStates.length > 0 && (
-              <select
-                value={filters.state}
-                onChange={(e) => setFilters({ ...filters, state: e.target.value })}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
-              >
-                <option value="">All States</option>
-                {availableStates.map((state) => (
-                  <option key={state.id} value={state.id}>
-                    {state.name}
-                  </option>
-                ))}
-              </select>
-            )}
+            <select
+              value={filters.state}
+              onChange={(e) => setFilters({ ...filters, state: e.target.value })}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              disabled={!filters.country}
+            >
+              <option value="">All States</option>
+              {availableStates.map(state => (
+                <option key={state.id} value={state.id}>{state.name}</option>
+              ))}
+            </select>
 
             <select
               value={filters.type}
               onChange={(e) => setFilters({ ...filters, type: e.target.value })}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">All Types</option>
-              {centerTypes.map((type) => (
-                <option key={type.id} value={type.id}>
-                  {type.name}
-                </option>
+              {centerTypes.map(type => (
+                <option key={type.id} value={type.id}>{type.name}</option>
               ))}
             </select>
 
-            {(filters.search || filters.country || filters.state || filters.type) && (
-              <button
-                onClick={() => setFilters({ country: '', state: '', type: '', search: '' })}
-                className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors font-medium"
-              >
-                Clear Filters
-              </button>
-            )}
+            <button
+              onClick={handleUseLocation}
+              disabled={loadingLocation}
+              className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 flex items-center justify-center gap-2 disabled:bg-gray-300"
+            >
+              {loadingLocation ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                  <span>Getting Location...</span>
+                </>
+              ) : (
+                <>
+                  <span>📍</span>
+                  <span>Use My Location</span>
+                </>
+              )}
+            </button>
           </div>
 
-          {/* Results Count */}
-          <div className="text-sm text-gray-600">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
             Showing <strong className="text-gray-900">{filteredCenters.length}</strong> of <strong className="text-gray-900">{allCenters.length}</strong> centers
           </div>
 
@@ -599,21 +547,29 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* Recent Activity */}
+          {/* FIXED: Filtered Centers List (previously "Recent Centers") */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-lg shadow-sm border p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Recent Centers</h3>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  {filters.search || filters.country || filters.state || filters.type 
+                    ? 'Filtered Centers' 
+                    : 'Recent Centers'}
+                </h3>
                 <span className="text-sm text-gray-600">
-                  {stats?.recentSubmissions || 0} added this week
+                  Showing {displayedCenters.length} of {filteredCenters.length} centers
                 </span>
               </div>
 
               <div className="space-y-4">
-                {recentCenters.length === 0 ? (
-                  <p className="text-gray-500 text-center py-8">No recent centers found</p>
+                {displayedCenters.length === 0 ? (
+                  <p className="text-gray-500 text-center py-8">
+                    {filters.search || filters.country || filters.state || filters.type
+                      ? 'No centers match your search criteria'
+                      : 'No centers found'}
+                  </p>
                 ) : (
-                  recentCenters.map((center) => (
+                  displayedCenters.map((center) => (
                     <div key={center.id} className="border-b border-gray-200 pb-4 last:border-b-0">
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
@@ -647,13 +603,13 @@ export default function AdminDashboard() {
                 )}
               </div>
 
-              {recentCenters.length > 0 && (
+              {filteredCenters.length > 10 && (
                 <div className="mt-6 text-center">
                   <Link
                     href="/admin/centers"
                     className="text-blue-600 hover:text-blue-800 font-medium"
                   >
-                    View All Centers →
+                    View All {filteredCenters.length} Centers →
                   </Link>
                 </div>
               )}

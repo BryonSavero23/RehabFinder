@@ -60,12 +60,10 @@ export default function GooglePlacesVerifier({
       setError(null)
       setResults([])
 
-      // Use Google Places API Text Search
       const query = `${centerName} rehabilitation ${currentAddress}`
       
       console.log('🔍 Searching Google Places for:', query)
 
-      // You'll need to implement this API route
       const response = await fetch('/api/google-places/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -94,9 +92,8 @@ export default function GooglePlacesVerifier({
   }
 
   const selectPlace = (place: PlaceResult) => {
-    // Determine business type from Google types
     let businessType = currentType
-    const types = place.types.map(t => t.toLowerCase())
+    const types = place.types?.map(t => t.toLowerCase()) || []
     
     if (types.includes('hospital') || types.includes('health')) {
       businessType = 'Hospital'
@@ -104,8 +101,7 @@ export default function GooglePlacesVerifier({
       businessType = 'Private'
     }
 
-    // Generate services description from types
-    const serviceTypes = place.types
+    const serviceTypes = (place.types || [])
       .filter(t => !['establishment', 'point_of_interest'].includes(t.toLowerCase()))
       .map(t => t.replace(/_/g, ' '))
       .join(', ')
@@ -167,52 +163,59 @@ export default function GooglePlacesVerifier({
           <div className="text-sm font-medium text-gray-700">
             Found {results.length} result{results.length > 1 ? 's' : ''}:
           </div>
-          {results.map((place) => (
-            <div
-              key={place.place_id}
-              className="bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors"
-            >
-              <div className="flex justify-between items-start mb-2">
-                <div className="flex-1">
-                  <h5 className="font-semibold text-gray-900 mb-1">
-                    {place.name}
-                  </h5>
-                  <p className="text-sm text-gray-600 mb-2">
-                    {place.formatted_address}
-                  </p>
-                  {place.formatted_phone_number && (
-                    <p className="text-sm text-gray-500">
-                      📞 {place.formatted_phone_number}
+          {results.map((place, placeIndex) => {
+            // Extract types with safety check
+            const placeTypes = place.types || []
+            
+            return (
+              <div
+                key={`place-${place.place_id}-${placeIndex}`}
+                className="bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors"
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <div className="flex-1">
+                    <h5 className="font-semibold text-gray-900 mb-1">
+                      {place.name}
+                    </h5>
+                    <p className="text-sm text-gray-600 mb-2">
+                      {place.formatted_address}
                     </p>
-                  )}
-                  {place.website && (
-                    <p className="text-sm text-blue-600 truncate">
-                      🌐 {place.website}
-                    </p>
-                  )}
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {place.types.slice(0, 3).map((type, typeIndex) => (
-                      <span
-                        key={`${place.place_id}-${type}-${typeIndex}`}
-                        className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700"
-                      >
-                        {type.replace(/_/g, ' ')}
-                      </span>
-                    ))}
+                    {place.formatted_phone_number && (
+                      <p className="text-sm text-gray-500">
+                        📞 {place.formatted_phone_number}
+                      </p>
+                    )}
+                    {place.website && (
+                      <p className="text-sm text-blue-600 truncate">
+                        🌐 {place.website}
+                      </p>
+                    )}
+                    {placeTypes.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {placeTypes.slice(0, 3).map((type, typeIndex) => (
+                          <span
+                            key={`place-${placeIndex}-type-${typeIndex}-${type}`}
+                            className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700"
+                          >
+                            {type.replace(/_/g, ' ')}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
+                <button
+                  onClick={() => selectPlace(place)}
+                  className="w-full mt-3 bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 font-medium"
+                >
+                  ✓ Use This Information
+                </button>
               </div>
-              <button
-                onClick={() => selectPlace(place)}
-                className="w-full mt-3 bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 font-medium"
-              >
-                ✓ Use This Information
-              </button>
-            </div>
-          ))}
+            )
+          })}
           <button
             onClick={() => setExpanded(false)}
-            className="w-full text-gray-600 hover:text-gray-800 text-sm font-medium"
+            className="w-full text-gray-600 hover:text-gray-800 text-sm font-medium mt-2"
           >
             Close Results
           </button>

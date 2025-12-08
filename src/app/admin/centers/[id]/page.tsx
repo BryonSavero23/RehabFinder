@@ -2,7 +2,7 @@
 'use client'
 
 import { use, useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 import GooglePlacesVerifier from '@/components/GooglePlacesVerifier'
@@ -55,6 +55,7 @@ interface VerifiedData {
 
 export default function EditCenterPage(props: EditCenterPageProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const params = use(props.params)
   const centerId = params.id
   const [center, setCenter] = useState<Centre | null>(null)
@@ -64,6 +65,9 @@ export default function EditCenterPage(props: EditCenterPageProps) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+
+  // Get return URL from query params, or default to centers list
+  const returnUrl = searchParams.get('returnUrl') || '/admin/centers'
 
   // Form state
   const [formData, setFormData] = useState({
@@ -407,7 +411,7 @@ export default function EditCenterPage(props: EditCenterPageProps) {
 
       if (deleteError) throw deleteError
 
-      router.push('/admin/centers')
+      router.push(returnUrl)
 
     } catch (err) {
       console.error('Error deleting center:', err)
@@ -442,7 +446,7 @@ export default function EditCenterPage(props: EditCenterPageProps) {
           <div className="text-red-500 text-xl mb-4">⚠️ Error</div>
           <p className="text-gray-600 mb-4">{error}</p>
           <Link 
-            href="/admin/centers"
+            href={returnUrl}
             className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
           >
             ← Back to Centers
@@ -461,7 +465,7 @@ export default function EditCenterPage(props: EditCenterPageProps) {
             <div>
               <div className="flex items-center gap-3 mb-2">
                 <Link 
-                  href="/admin/centers"
+                  href={returnUrl}
                   className="text-blue-600 hover:text-blue-800"
                 >
                   ← Centers

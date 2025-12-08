@@ -16,7 +16,7 @@ export const exerciseVideos: ExerciseVideo[] = [
     description: 'Arm & Hand Stretches for Spasticity After Stroke',
     youtubeId: '_ELCjpovYTk',
     category: 'Arm & Hand',
-    duration: '10 mins',
+    duration: '12 mins',
     difficulty: 'Beginner'
   },
   {
@@ -25,7 +25,7 @@ export const exerciseVideos: ExerciseVideo[] = [
     description: 'Stroke Hand Exercises: For every stage of recovery',
     youtubeId: 'gDxyQGyOx_0',
     category: 'Hand Exercises',
-    duration: '12 mins',
+    duration: '21:24 mins',
     difficulty: 'Beginner'
   },
   {
@@ -34,7 +34,7 @@ export const exerciseVideos: ExerciseVideo[] = [
     description: 'Easy Leg Exercises for Stroke Patients (Guided by a Physical Therapist)',
     youtubeId: '-rwby0zA6Vs',
     category: 'Leg Exercises',
-    duration: '8 mins',
+    duration: '10:23 mins',
     difficulty: 'Beginner'
   },
   {
@@ -43,7 +43,25 @@ export const exerciseVideos: ExerciseVideo[] = [
     description: 'Leg Exercises For Each Stage Of Stroke Recovery',
     youtubeId: 'KV-wCJRioRw',
     category: 'Leg Exercises',
-    duration: '5 mins',
+    duration: '1 min',
+    difficulty: 'Beginner'
+  },
+  {
+    id: '5',
+    title: 'Toe Rehabilitation Exercise Video 1',
+    description: 'Toe Exercises For Each Stage Of Stroke Recovery',
+    youtubeId: 'azdPlkX8_1Q',
+    category: 'Toe Exercises',
+    duration: '0:45 mins',
+    difficulty: 'Beginner'
+  },
+  {
+    id: '6',
+    title: 'Toe Rehabilitation Exercise Video 2',
+    description: 'Toe Exercises For Each Stage Of Stroke Recovery',
+    youtubeId: '3UQCp4dbuRY',
+    category: 'Toe Exercises',
+    duration: '13:01 mins',
     difficulty: 'Beginner'
   }
 ]

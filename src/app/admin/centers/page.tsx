@@ -1,9 +1,10 @@
-// src/app/admin/centers/page.tsx - Admin Centers Management Page (Cleaned)
+// src/app/admin/centers/page.tsx - Admin Centers Management Page 
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 interface Centre {
   id: string
@@ -17,6 +18,7 @@ interface Centre {
   services?: string | null
   accessibility: boolean
   country_id: string
+  state_id?: string | null
   center_type_id: string
   active: boolean
   verified: boolean
@@ -29,6 +31,12 @@ interface Country {
   code: string
 }
 
+interface State {
+  id: string
+  name: string
+  country_id: string
+}
+
 interface CenterType {
   id: string
   name: string
@@ -38,6 +46,7 @@ interface CenterType {
 interface Filters {
   search: string
   country: string
+  state: string
   type: string
   verified: string
   active: string
@@ -45,22 +54,54 @@ interface Filters {
 }
 
 export default function AdminCentersPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  
   const [centers, setCenters] = useState<Centre[]>([])
   const [countries, setCountries] = useState<Country[]>([])
+  const [states, setStates] = useState<State[]>([])
   const [centerTypes, setCenterTypes] = useState<CenterType[]>([])
   const [filters, setFilters] = useState<Filters>({
-    search: '',
-    country: '',
-    type: '',
-    verified: '',
-    active: '',
-    needsGeocode: false
+    search: searchParams.get('search') || '',
+    country: searchParams.get('country') || '',
+    state: searchParams.get('state') || '',
+    type: searchParams.get('type') || '',
+    verified: searchParams.get('verified') || '',
+    active: searchParams.get('active') || '',
+    needsGeocode: searchParams.get('needsGeocode') === 'true'
   })
   const [loading, setLoading] = useState(true)
   const [selectedCenters, setSelectedCenters] = useState<Set<string>>(new Set())
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(20)
   const [bulkActionLoading, setBulkActionLoading] = useState(false)
+
+  // Check if selected country is Thailand
+  const isThailand = useMemo(() => {
+    if (!filters.country) return false
+    const country = countries.find(c => c.id === filters.country)
+    return country?.code === 'TH' || country?.name === 'Thailand'
+  }, [countries, filters.country])
+
+  // Filter states/provinces based on selected country
+  const availableStates = useMemo(() => {
+    if (!filters.country) return []
+    return states.filter(state => state.country_id === filters.country)
+  }, [states, filters.country])
+
+  // Update URL when filters change
+  useEffect(() => {
+    const params = new URLSearchParams()
+    if (filters.search) params.set('search', filters.search)
+    if (filters.country) params.set('country', filters.country)
+    if (filters.state) params.set('state', filters.state)
+    if (filters.type) params.set('type', filters.type)
+    if (filters.verified) params.set('verified', filters.verified)
+    if (filters.active) params.set('active', filters.active)
+    if (filters.needsGeocode) params.set('needsGeocode', 'true')
+    
+    router.replace(`/admin/centers?${params.toString()}`, { scroll: false })
+  }, [filters, router])
 
   useEffect(() => {
     fetchData()
@@ -111,10 +152,14 @@ export default function AdminCentersPage() {
         return allCenters
       }
 
-      const [centers, countriesResult, typesResult] = await Promise.all([
+      const [centers, countriesResult, statesResult, typesResult] = await Promise.all([
         fetchAllCenters(),
         supabase
           .from('countries')
+          .select('*')
+          .order('name'),
+        supabase
+          .from('states')
           .select('*')
           .order('name'),
         supabase
@@ -127,6 +172,10 @@ export default function AdminCentersPage() {
         console.error('Countries query error:', countriesResult.error)
         throw countriesResult.error
       }
+      if (statesResult.error) {
+        console.error('States query error:', statesResult.error)
+        throw statesResult.error
+      }
       if (typesResult.error) {
         console.error('Types query error:', typesResult.error)
         throw typesResult.error
@@ -136,6 +185,7 @@ export default function AdminCentersPage() {
 
       setCenters(centers)
       setCountries(countriesResult.data || [])
+      setStates(statesResult.data || [])
       setCenterTypes(typesResult.data || [])
 
     } catch (err) {
@@ -160,6 +210,10 @@ export default function AdminCentersPage() {
 
     if (filters.country) {
       filtered = filtered.filter(center => center.country_id === filters.country)
+    }
+
+    if (filters.state) {
+      filtered = filtered.filter(center => center.state_id === filters.state)
     }
 
     if (filters.type) {
@@ -193,6 +247,11 @@ export default function AdminCentersPage() {
 
   const getCountryName = (countryId: string) => {
     return countries.find(c => c.id === countryId)?.name || 'Unknown'
+  }
+
+  const getStateName = (stateId: string | null | undefined) => {
+    if (!stateId) return null
+    return states.find(s => s.id === stateId)?.name || null
   }
 
   const getCenterTypeName = (typeId: string) => {
@@ -266,11 +325,26 @@ export default function AdminCentersPage() {
     setFilters({
       search: '',
       country: '',
+      state: '',
       type: '',
       verified: '',
       active: '',
       needsGeocode: false
     })
+  }
+
+  // Build current filter query string for links
+  const getReturnUrl = () => {
+    const params = new URLSearchParams()
+    if (filters.search) params.set('search', filters.search)
+    if (filters.country) params.set('country', filters.country)
+    if (filters.state) params.set('state', filters.state)
+    if (filters.type) params.set('type', filters.type)
+    if (filters.verified) params.set('verified', filters.verified)
+    if (filters.active) params.set('active', filters.active)
+    if (filters.needsGeocode) params.set('needsGeocode', 'true')
+    const queryString = params.toString()
+    return queryString ? `?returnUrl=${encodeURIComponent(`/admin/centers?${queryString}`)}` : ''
   }
 
   if (loading) {
@@ -319,7 +393,7 @@ export default function AdminCentersPage() {
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h3 className="font-semibold text-gray-900 mb-4">Filters</h3>
           
-          <div className="grid md:grid-cols-5 gap-4 mb-4">
+          <div className="grid md:grid-cols-6 gap-4 mb-4">
             <input
               type="text"
               placeholder="Search centers..."
@@ -330,7 +404,7 @@ export default function AdminCentersPage() {
             
             <select
               value={filters.country}
-              onChange={(e) => setFilters({ ...filters, country: e.target.value })}
+              onChange={(e) => setFilters({ ...filters, country: e.target.value, state: '' })}
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">All Countries</option>
@@ -338,6 +412,22 @@ export default function AdminCentersPage() {
                 <option key={country.id} value={country.id}>{country.name}</option>
               ))}
             </select>
+            
+            {/* Dynamic State/Province selector - shows when country is selected and has states */}
+            {availableStates.length > 0 && (
+              <select
+                value={filters.state}
+                onChange={(e) => setFilters({ ...filters, state: e.target.value })}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">
+                  {isThailand ? 'All Provinces' : 'All States'}
+                </option>
+                {availableStates.map(state => (
+                  <option key={state.id} value={state.id}>{state.name}</option>
+                ))}
+              </select>
+            )}
             
             <select
               value={filters.type}
@@ -473,7 +563,10 @@ export default function AdminCentersPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm text-gray-900">{center.address}</div>
-                      <div className="text-sm text-gray-500">{getCountryName(center.country_id)}</div>
+                      <div className="text-sm text-gray-500">
+                        {getCountryName(center.country_id)}
+                        {getStateName(center.state_id) && ` • ${getStateName(center.state_id)}`}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
@@ -501,7 +594,7 @@ export default function AdminCentersPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <Link
-                        href={`/admin/centers/${center.id}`}
+                        href={`/admin/centers/${center.id}${getReturnUrl()}`}
                         className="text-blue-600 hover:text-blue-900"
                       >
                         Edit

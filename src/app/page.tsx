@@ -925,7 +925,7 @@ export default function HomePage() {
       {/* Footer */}
       <footer className="bg-gray-800 text-white py-8">
         <div className="max-w-7xl mx-auto px-4 text-center">
-          <p className="text-gray-300">© 2024 RehabFinder. Connecting you to recovery resources in Malaysia & Thailand.</p>
+          <p className="text-gray-300">© 2025 RehabFinder. Connecting you to recovery resources in Malaysia & Thailand.</p>
           <p className="text-gray-400 text-sm mt-2">Phase 1: Rehabilitation Centers Database • Phase 2: Exercise Videos Now Live!</p>
         </div>
       </footer>

@@ -314,12 +314,21 @@ export default function AdminDashboard() {
               <h1 className="text-3xl font-bold text-gray-900">RehabFinder Admin</h1>
               <p className="text-gray-600 mt-1">Manage rehabilitation centers and system data</p>
             </div>
-            <Link
-              href="/"
-              className="text-blue-600 hover:text-blue-800 font-medium"
-            >
-              → View Public Site
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/centers/new"
+                className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 font-medium flex items-center gap-2"
+              >
+                <span>➕</span>
+                <span>Add New Center</span>
+              </Link>
+              <Link
+                href="/"
+                className="text-blue-600 hover:text-blue-800 font-medium"
+              >
+                → View Public Site
+              </Link>
+            </div>
           </div>
         </div>
       </div>

@@ -263,6 +263,7 @@ export default function ContactPage() {
                     <p className="text-sm font-medium text-gray-700">Email</p>
                     <a href="mailto:info@rehabfinder.com" className="text-blue-600 hover:text-blue-800">
                       bryonsavero.work@gmail.com
+                      fadra.hassan@gmail.com
                     </a>
                   </div>
                 </div>
